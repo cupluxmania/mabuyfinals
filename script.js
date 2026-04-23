@@ -11,24 +11,18 @@ let allData = [];
 let zoomLevel = 1;
 let activeFilter = "all";
 
-/* =========================
-   CLEAN
-========================= */
+/* CLEAN */
 function cleanText(val){
     if(!val) return "";
     return String(val).replace(/\u00A0/g," ").replace(/\s+/g," ").trim();
 }
 
-/* =========================
-   NORMALIZE (FOR MATCH ONLY)
-========================= */
+/* NORMALIZE */
 function normalizeId(id){
     return String(id).replace(/\s+/g,"").toLowerCase();
 }
 
-/* =========================
-   STATUS
-========================= */
+/* STATUS */
 function getStatus(row){
     const s = cleanText(row.status).toLowerCase();
     if(s==="sold") return "sold";
@@ -37,9 +31,7 @@ function getStatus(row){
     return "available";
 }
 
-/* =========================
-   LOAD DATA (FIXED)
-========================= */
+/* LOAD DATA */
 async function loadData(){
     const res = await fetch(`${G_SCRIPT_URL}?cmd=read&t=${Date.now()}`);
     const raw = await res.json();
@@ -60,8 +52,8 @@ async function loadData(){
 
         booths.forEach(id=>{
             expanded.push({
-                rawId: id, // KEEP ORIGINAL (5035-A)
-                normId: normalizeId(id), // for matching
+                rawId: id,
+                normId: normalizeId(id),
                 status: getStatus(row),
                 exhibitor: cleanText(row.exhibitor),
                 sqm: eachSize,
@@ -71,13 +63,10 @@ async function loadData(){
     });
 
     allData = expanded;
-
     renderFloor();
 }
 
-/* =========================
-   HALL CONFIG
-========================= */
+/* HALL CONFIG */
 const hallConfig = [
   {name:"Hall 5", start:5001, end:5078},
   {name:"Hall 6", start:6001, end:6189},
@@ -87,21 +76,15 @@ const hallConfig = [
   {name:"Hall 10", start:1001, end:1151},
 ];
 
-/* =========================
-   FIND MATCH (FIX CORE BUG)
-========================= */
+/* FIND */
 function findBooth(id){
     const norm = normalizeId(id);
-
     return allData.filter(x =>
-        x.normId === norm ||
-        x.normId.startsWith(norm + "-") // support 5035-A
+        x.normId === norm || x.normId.startsWith(norm + "-")
     );
 }
 
-/* =========================
-   RENDER
-========================= */
+/* RENDER */
 function renderFloor(){
     floor.innerHTML="";
 
@@ -109,27 +92,46 @@ function renderFloor(){
         const hallDiv = document.createElement("div");
         hallDiv.className="hall";
 
+        const header = document.createElement("div");
+        header.className = "hall-header";
+
         const title = document.createElement("h3");
         title.innerText = hall.name;
-        hallDiv.appendChild(title);
+
+        const summary = document.createElement("div");
+        summary.className = "hall-summary";
+
+        const counts = {available:0,sold:0,booked:0,agent:0};
 
         const grid = document.createElement("div");
         grid.className="grid";
 
         for(let i=hall.start;i<=hall.end;i++){
-            grid.appendChild(createBooth(String(i)));
+            const booth = createBooth(String(i));
+            grid.appendChild(booth);
+
+            const status = booth.classList[1];
+            if(counts[status] !== undefined) counts[status]++;
         }
 
+        Object.keys(counts).forEach(k=>{
+            const chip = document.createElement("div");
+            chip.className="count-chip";
+            chip.innerHTML = `<span class="dot ${k}"></span>${counts[k]}`;
+            summary.appendChild(chip);
+        });
+
+        header.appendChild(title);
+        header.appendChild(summary);
+
+        hallDiv.appendChild(header);
         hallDiv.appendChild(grid);
         floor.appendChild(hallDiv);
     });
 }
 
-/* =========================
-   CREATE BOOTH (FIXED)
-========================= */
+/* CREATE */
 function createBooth(id){
-
     const matches = findBooth(id);
 
     const b = document.createElement("div");
@@ -141,7 +143,6 @@ function createBooth(id){
     let type="";
 
     if(matches.length){
-
         if(matches.some(x=>x.status==="agent")) status="agent";
         else if(matches.some(x=>x.status==="sold")) status="sold";
         else if(matches.some(x=>x.status==="booked")) status="booked";
@@ -153,25 +154,21 @@ function createBooth(id){
 
     b.className = "booth " + status;
 
-    // FILTER
     if(activeFilter !== "all" && status !== activeFilter){
         b.classList.add("hidden-booth");
     }
 
-    // TYPE ARSIR
     if(type.toLowerCase().includes("space")) b.classList.add("type-space");
     if(type.toLowerCase().includes("shell")) b.classList.add("type-shell");
 
     b.innerText = id;
 
-    // TOOLTIP (CLEAN)
     b.dataset.tooltip = exhibitor
         ? `${exhibitor} [ ${sqm} Sqm ] [ ${type} ]`
         : `AVAILABLE [ ${sqm} Sqm ]`;
 
     b.onclick = (e)=>{
         e.stopPropagation();
-
         panel.classList.remove("hidden");
         panelContent.innerHTML = `
             <b>Booth:</b> ${id}<br>
@@ -185,9 +182,7 @@ function createBooth(id){
     return b;
 }
 
-/* =========================
-   SEARCH (FIXED)
-========================= */
+/* SEARCH */
 searchBox.addEventListener("input",()=>{
     const val = searchBox.value.toLowerCase();
 
@@ -203,7 +198,6 @@ searchBox.addEventListener("input",()=>{
         const div = document.createElement("div");
         div.className="suggestionItem";
         div.innerText = `${x.rawId} - ${x.exhibitor}`;
-
         div.onclick=()=>{
             const el = [...document.querySelectorAll(".booth")]
                 .find(b => b.innerText === x.rawId.split("-")[0]);
@@ -215,27 +209,21 @@ searchBox.addEventListener("input",()=>{
 
             suggestions.style.display="none";
         };
-
         suggestions.appendChild(div);
     });
 });
 
-/* =========================
-   LEGEND FILTER
-========================= */
+/* LEGEND */
 document.querySelectorAll(".legend-item").forEach(item=>{
     item.onclick=()=>{
         document.querySelectorAll(".legend-item").forEach(i=>i.classList.remove("active"));
         item.classList.add("active");
-
         activeFilter = item.dataset.filter;
         renderFloor();
     };
 });
 
-/* =========================
-   DRAG
-========================= */
+/* DRAG */
 let isDown=false,startX,startY,scrollLeft,scrollTop;
 
 container.addEventListener("mousedown",e=>{
@@ -253,15 +241,11 @@ container.addEventListener("mousemove",e=>{
     container.scrollTop = scrollTop-(e.pageY-startY);
 });
 
-/* =========================
-   ZOOM
-========================= */
+/* ZOOM */
 zoomIn.onclick=()=>{zoomLevel+=0.1;floor.style.transform=`scale(${zoomLevel})`;}
 zoomOut.onclick=()=>{zoomLevel=Math.max(0.5,zoomLevel-0.1);floor.style.transform=`scale(${zoomLevel})`;}
 
-/* =========================
-   CLOSE
-========================= */
+/* CLOSE */
 document.addEventListener("click",()=>{
     panel.classList.add("hidden");
     suggestions.style.display="none";
