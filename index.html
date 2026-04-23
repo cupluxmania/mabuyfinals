@@ -6,7 +6,6 @@
 <title>Hospital Expo Floorplan</title>
 <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
 <header>Int'l Hospital Expo @ ICE BSD 2026</header>
@@ -18,11 +17,28 @@
         <div id="suggestions"></div>
     </div>
 
+    <!-- 🔥 INTERACTIVE LEGEND -->
     <div id="legend">
-        <div><span class="dot available"></span> Available</div>
-        <div><span class="dot sold"></span> Sold</div>
-        <div><span class="dot booked"></span> Booked</div>
-        <div><span class="dot agent"></span> Agent</div>
+        <div class="legend-item available active" data-status="available">
+            <span class="legend-dot"></span>
+            <span>Available</span>
+            <b class="count">0</b>
+        </div>
+        <div class="legend-item sold active" data-status="sold">
+            <span class="legend-dot"></span>
+            <span>Sold</span>
+            <b class="count">0</b>
+        </div>
+        <div class="legend-item booked active" data-status="booked">
+            <span class="legend-dot"></span>
+            <span>Booked</span>
+            <b class="count">0</b>
+        </div>
+        <div class="legend-item agent active" data-status="agent">
+            <span class="legend-dot"></span>
+            <span>Agent</span>
+            <b class="count">0</b>
+        </div>
     </div>
 
     <div id="menu">
