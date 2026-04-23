@@ -1,61 +1,101 @@
-body {
+/* BASE */
+body{
     margin:0;
-    font-family: Inter, sans-serif;
+    font-family:'Segoe UI',sans-serif;
     background:#eef2f7;
 }
 
-header {
+header{
     background:white;
     padding:20px 40px;
-    font-size:24px;
+    font-size:22px;
     font-weight:700;
+    border-bottom:1px solid #ddd;
 }
 
-.container { padding:20px 40px; }
+/* CONTAINER */
+.container{
+    padding:20px 40px;
+}
 
-/* LEGEND */
-#legend {
+/* SEARCH */
+#searchBox{
+    width:100%;
+    padding:14px;
+    border-radius:10px;
+    border:1px solid #ccc;
+}
+
+/* LEGEND (PREMIUM + HORIZONTAL) */
+#legend{
     display:flex;
     gap:10px;
-    margin-bottom:15px;
+    margin:15px 0;
+    flex-wrap:wrap;
 }
 
-.legend-item {
+.legend-item{
     display:flex;
     align-items:center;
     gap:6px;
-    padding:6px 12px;
-    border-radius:999px;
+    padding:8px 14px;
+    border-radius:20px;
     background:white;
-    cursor:pointer;
     border:1px solid #ddd;
-    font-size:13px;
+    cursor:pointer;
+    transition:0.2s;
 }
 
-.legend-item.active {
-    box-shadow:0 4px 12px rgba(0,0,0,0.2);
+.legend-item.active{
+    background:#111827;
+    color:white;
 }
 
-.legend-dot {
-    width:10px;height:10px;border-radius:3px;
+/* DOT */
+.dot{
+    width:10px;
+    height:10px;
+    border-radius:50%;
 }
 
-.available .legend-dot { background:#3b82f6; }
-.sold .legend-dot { background:#ef4444; }
-.booked .legend-dot { background:#eab308; }
-.agent .legend-dot { background:#22c55e; }
+.available{ background:#3b82f6;}
+.sold{ background:#ef4444;}
+.booked{ background:#eab308;}
+.agent{ background:#22c55e;}
+
+/* FLOOR */
+#floorContainer{
+    height:75vh;
+    overflow:auto;
+    background:white;
+    border-radius:12px;
+    cursor:grab;
+}
+
+#floor{
+    display:flex;
+    gap:80px;
+    padding:80px;
+}
+
+/* HALL */
+.hall{
+    display:flex;
+    flex-direction:column;
+    gap:15px;
+}
 
 /* GRID */
-.grid {
+.grid{
     display:grid;
-    grid-template-columns:repeat(10,80px);
+    grid-template-columns:repeat(8,70px);
     gap:10px;
 }
 
 /* BOOTH */
-.booth {
-    width:80px;
-    height:80px;
+.booth{
+    width:70px;
+    height:70px;
     border-radius:10px;
     display:flex;
     align-items:center;
@@ -63,56 +103,59 @@ header {
     color:white;
     font-size:11px;
     cursor:pointer;
+    transition:0.2s;
     position:relative;
 }
 
-.booth:hover {
+.booth:hover{
     transform:scale(1.08);
 }
 
-/* STATUS COLORS */
-.available { background:#3b82f6; }
-.sold { background:#ef4444; }
-.booked { background:#eab308; }
-.agent { background:#22c55e; }
-
-/* TYPE ARSIR */
-.type-space {
-    background-image: repeating-linear-gradient(
-        45deg,
-        rgba(255,255,255,0.2),
-        rgba(255,255,255,0.2) 5px,
-        transparent 5px,
-        transparent 10px
-    );
-}
-
-.type-shell {
-    border:2px solid white;
-}
-
 /* TOOLTIP */
-.booth:hover::after {
+.booth:hover::after{
     content:attr(data-tooltip);
     position:absolute;
     bottom:110%;
     left:50%;
     transform:translateX(-50%);
-    background:black;
+    background:#111827;
     color:white;
     padding:6px 10px;
     border-radius:6px;
     font-size:12px;
 }
 
+/* TYPE ARSIR */
+.type-space{
+    background-image: repeating-linear-gradient(
+        45deg,
+        rgba(255,255,255,0.15),
+        rgba(255,255,255,0.15) 6px,
+        transparent 6px,
+        transparent 12px
+    );
+}
+
+.type-shell{
+    border:2px solid rgba(0,0,0,0.4);
+}
+
+/* FILTER */
+.hidden-booth{
+    opacity:0.1;
+}
+
 /* PANEL */
-#sidePanel {
+#sidePanel{
     position:fixed;
     right:20px;
     top:120px;
     background:white;
     padding:20px;
     border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.2);
 }
 
-.hidden { display:none; }
+.hidden{
+    display:none;
+}
