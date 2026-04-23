@@ -8,7 +8,8 @@ const panel = document.getElementById("sidePanel");
 const panelContent = document.getElementById("panelContent");
 
 let allData = [];
-let activeFilter = new Set(["available","sold","booked","agent"]);
+let zoomLevel = 1;
+let activeFilter = "all";
 
 /* CLEAN */
 function cleanText(val){
@@ -18,14 +19,16 @@ function cleanText(val){
 
 /* STATUS */
 function getStatus(row){
-    let s = cleanText(row.status).toLowerCase();
-    if(["available","sold","booked","agent"].includes(s)) return s;
+    const s = cleanText(row.status).toLowerCase();
+    if(s==="sold") return "sold";
+    if(s==="booked") return "booked";
+    if(s==="agent") return "agent";
     return "available";
 }
 
-/* LOAD */
+/* LOAD DATA */
 async function loadData(){
-    const res = await fetch(`${G_SCRIPT_URL}?cmd=read&t=${Date.now()}`);
+    const res = await fetch(`${G_SCRIPT_URL}?t=${Date.now()}`);
     const raw = await res.json();
 
     const expanded = [];
@@ -33,14 +36,17 @@ async function loadData(){
     raw.forEach(row=>{
         if(!row.boothid) return;
 
-        const booths = String(row.boothid).split(",").map(x=>x.trim()).filter(Boolean);
-        const size = parseFloat(row.size)||0;
-        const each = booths.length ? size/booths.length : 0;
+        const booths = String(row.boothid)
+            .split(",")
+            .map(x=>x.trim())
+            .filter(Boolean);
+
+        const size = parseFloat(row.size) || 0;
+        const each = booths.length ? size/booths.length : size;
 
         booths.forEach(id=>{
             expanded.push({
-                boothid:id.toLowerCase(),
-                display:id,
+                id,
                 status:getStatus(row),
                 exhibitor:cleanText(row.exhibitor),
                 sqm:each,
@@ -50,73 +56,138 @@ async function loadData(){
     });
 
     allData = expanded;
-    updateLegendCount();
-    render();
+    renderFloor();
+}
+
+/* HALL CONFIG */
+const hallConfig = [
+  {name:"Hall 5", start:5001, end:5078},
+  {name:"Hall 6", start:6001, end:6189},
+  {name:"Hall 7", start:7001, end:7196},
+  {name:"Hall 8", start:8001, end:8181},
+  {name:"Hall 9", start:9001, end:9191},
+  {name:"Hall 10", start:1001, end:1151},
+];
+
+/* RENDER */
+function renderFloor(){
+    floor.innerHTML="";
+
+    hallConfig.forEach(hall=>{
+        const hallDiv = document.createElement("div");
+        hallDiv.className="hall";
+
+        const title = document.createElement("h3");
+        title.innerText = hall.name;
+        hallDiv.appendChild(title);
+
+        const grid = document.createElement("div");
+        grid.className="grid";
+
+        for(let i=hall.start;i<=hall.end;i++){
+            const id = String(i);
+            grid.appendChild(createBooth(id));
+        }
+
+        hallDiv.appendChild(grid);
+        floor.appendChild(hallDiv);
+    });
+}
+
+/* CREATE BOOTH */
+function createBooth(id){
+
+    const data = allData.find(x=>x.id===id);
+
+    const b = document.createElement("div");
+    b.className="booth";
+
+    let status="available";
+    let exhibitor="";
+    let sqm=0;
+    let type="";
+
+    if(data){
+        status=data.status;
+        exhibitor=data.exhibitor;
+        sqm=data.sqm;
+        type=data.type;
+    }
+
+    b.classList.add(status);
+
+    // FILTER
+    if(activeFilter !== "all" && status !== activeFilter){
+        b.classList.add("hidden-booth");
+    }
+
+    // TYPE PATTERN (ARSIR)
+    if(type.toLowerCase().includes("space")){
+        b.classList.add("type-space");
+    }
+    if(type.toLowerCase().includes("shell")){
+        b.classList.add("type-shell");
+    }
+
+    b.innerText=id;
+
+    // HOVER TEXT (CLEAN)
+    b.dataset.tooltip = exhibitor 
+        ? `${exhibitor} [ ${sqm} Sqm ] [ ${type} ]`
+        : `AVAILABLE [ ${sqm} Sqm ]`;
+
+    // CLICK PANEL
+    b.onclick = (e)=>{
+        e.stopPropagation();
+
+        panel.classList.remove("hidden");
+        panelContent.innerHTML = `
+            <b>Booth:</b> ${id}<br>
+            <b>Size:</b> ${sqm} Sqm<br>
+            <b>Type:</b> ${type || "-"}<br>
+            <b>Status:</b> ${status.toUpperCase()}<br>
+            <b>Exhibitor:</b> ${exhibitor || "-"}
+        `;
+    };
+
+    return b;
 }
 
 /* LEGEND FILTER */
-document.querySelectorAll(".legend-item").forEach(el=>{
-    el.onclick = ()=>{
-        const status = el.dataset.status;
+document.querySelectorAll(".legend-item").forEach(item=>{
+    item.onclick = ()=>{
+        document.querySelectorAll(".legend-item").forEach(i=>i.classList.remove("active"));
+        item.classList.add("active");
 
-        if(activeFilter.has(status)){
-            activeFilter.delete(status);
-            el.classList.remove("active");
-        }else{
-            activeFilter.add(status);
-            el.classList.add("active");
-        }
-
-        render();
+        activeFilter = item.dataset.filter;
+        renderFloor();
     };
 });
 
-/* COUNT */
-function updateLegendCount(){
-    const count = {available:0,sold:0,booked:0,agent:0};
-    allData.forEach(x=>count[x.status]++);
+/* DRAG */
+let isDown=false, startX, startY, scrollLeft, scrollTop;
 
-    document.querySelectorAll(".legend-item").forEach(el=>{
-        const s = el.dataset.status;
-        el.querySelector(".count").innerText = count[s]||0;
-    });
-}
+container.addEventListener("mousedown",e=>{
+    isDown=true;
+    startX=e.pageX;
+    startY=e.pageY;
+    scrollLeft=container.scrollLeft;
+    scrollTop=container.scrollTop;
+});
+container.addEventListener("mouseup",()=>isDown=false);
+container.addEventListener("mouseleave",()=>isDown=false);
+container.addEventListener("mousemove",e=>{
+    if(!isDown) return;
+    container.scrollLeft = scrollLeft-(e.pageX-startX);
+    container.scrollTop = scrollTop-(e.pageY-startY);
+});
 
-/* RENDER */
-function render(){
-    floor.innerHTML="";
+/* ZOOM */
+zoomIn.onclick=()=>{zoomLevel+=0.1;floor.style.transform=`scale(${zoomLevel})`;}
+zoomOut.onclick=()=>{zoomLevel=Math.max(0.5,zoomLevel-0.1);floor.style.transform=`scale(${zoomLevel})`;}
 
-    const grid = document.createElement("div");
-    grid.className="grid";
-
-    allData.forEach(x=>{
-        if(!activeFilter.has(x.status)) return;
-
-        const b = document.createElement("div");
-        b.className = "booth "+x.status;
-
-        if(x.type.toLowerCase().includes("space")) b.classList.add("type-space");
-        if(x.type.toLowerCase().includes("shell")) b.classList.add("type-shell");
-
-        b.innerHTML = `<span>${x.display}</span>`;
-
-        b.dataset.tooltip = `${x.exhibitor || "Available"} [ ${x.sqm} Sqm ] [ ${x.type||"-"} ]`;
-
-        b.onclick = ()=>{
-            panel.classList.remove("hidden");
-            panelContent.innerHTML = `
-                <b>Booth:</b> ${x.display}<br>
-                <b>Size:</b> ${x.sqm} Sqm<br>
-                <b>Type:</b> ${x.type}<br>
-                <b>Status:</b> ${x.status}<br>
-                <b>Exhibitor:</b> ${x.exhibitor || "-"}
-            `;
-        };
-
-        grid.appendChild(b);
-    });
-
-    floor.appendChild(grid);
-}
+document.addEventListener("click",()=>{
+    panel.classList.add("hidden");
+});
 
 loadData();
