@@ -10,60 +10,79 @@ const panelContent = document.getElementById("panelContent");
 let allData = [];
 let zoomLevel = 1;
 
-/* CLEAN */
+/* =========================
+   CLEAN TEXT
+========================= */
 function cleanText(val){
     if(!val) return "";
     return String(val).replace(/\s+/g," ").trim();
 }
 
-/* NORMALIZE */
+/* =========================
+   NORMALIZE ID
+========================= */
 function normalizeId(id){
-    return String(id || "").replace(/\s+/g,"").toLowerCase();
+    return String(id || "")
+        .replace(/\u00A0/g, "")
+        .replace(/\s+/g, "")
+        .trim()
+        .toLowerCase();
 }
 
-/* STATUS */
+/* =========================
+   STATUS
+========================= */
 function getStatus(row){
     let s = cleanText(row.status).toLowerCase();
     if(["available","sold","booked","agent"].includes(s)) return s;
     return "available";
 }
 
-/* LOAD */
+/* =========================
+   LOAD DATA
+========================= */
 async function loadData(){
-    const res = await fetch(`${G_SCRIPT_URL}?t=${Date.now()}`);
-    const raw = await res.json();
+    try {
+        const res = await fetch(`${G_SCRIPT_URL}?t=${Date.now()}`);
+        const raw = await res.json();
 
-    const expanded = [];
+        const expanded = [];
 
-    raw.forEach(row=>{
-        if(!row.boothid) return;
+        raw.forEach(row=>{
+            if(!row.boothid) return;
 
-        const booths = String(row.boothid)
-            .split(",")
-            .map(x=>x.trim())
-            .filter(Boolean);
+            const booths = String(row.boothid)
+                .split(",")
+                .map(x=>x.replace(/\n/g,"").trim())
+                .filter(Boolean);
 
-        const count = booths.length;
-        const size = parseFloat(row.size) || 0;
-        const eachSize = count ? size / count : 0;
+            const count = booths.length;
+            const size = parseFloat(row.size) || 0;
+            const eachSize = count ? size / count : 0;
 
-        booths.forEach(id=>{
-            expanded.push({
-                boothid: normalizeId(id),
-                displayId: id,
-                exhibitor: cleanText(row.exhibitor),
-                status: getStatus(row),
-                sqm: eachSize,
-                type: cleanText(row.type) || "-"
+            booths.forEach(id=>{
+                expanded.push({
+                    boothid: normalizeId(id),
+                    displayId: id.trim(),
+                    exhibitor: cleanText(row.exhibitor),
+                    status: getStatus(row),
+                    sqm: eachSize,
+                    type: cleanText(row.type) || "-"
+                });
             });
         });
-    });
 
-    allData = expanded;
-    renderFloor();
+        allData = expanded;
+        renderFloor();
+
+    } catch(err){
+        console.error("LOAD ERROR:", err);
+    }
 }
 
-/* HALL CONFIG */
+/* =========================
+   HALL CONFIG
+========================= */
 const hallConfig = [
   {name:"Hall 5", start:5001, end:5078},
   {name:"Hall 6", start:6001, end:6189},
@@ -73,7 +92,9 @@ const hallConfig = [
   {name:"Hall 10", start:1001, end:1151}
 ];
 
-/* RENDER */
+/* =========================
+   RENDER FLOOR
+========================= */
 function renderFloor(){
     floor.innerHTML = "";
 
@@ -93,14 +114,36 @@ function renderFloor(){
         grid.className = "grid";
 
         for(let i=hall.start;i<=hall.end;i++){
+
             const id = String(i);
-            const data = allData.find(x=>x.boothid===normalizeId(id));
 
-            const booth = createBooth(id,data);
+            /* 🔥 FIXED MATCH LOGIC */
+            const matches = allData.filter(x =>
+                x.boothid === normalizeId(id) ||
+                x.boothid.startsWith(normalizeId(id) + "-")
+            );
+
+            let data = null;
+
+            if(matches.length){
+                data = {
+                    status:
+                        matches.some(x=>x.status==="agent") ? "agent" :
+                        matches.some(x=>x.status==="sold") ? "sold" :
+                        matches.some(x=>x.status==="booked") ? "booked" : "available",
+
+                    exhibitor: matches.map(x=>x.exhibitor).filter(Boolean).join(", "),
+                    sqm: matches[0].sqm,
+                    type: matches[0].type
+                };
+
+                stats[data.status]++;
+            } else {
+                stats.available++;
+            }
+
+            const booth = createBooth(id, data);
             grid.appendChild(booth);
-
-            if(data) stats[data.status]++;
-            else stats.available++;
         }
 
         header.appendChild(title);
@@ -113,7 +156,9 @@ function renderFloor(){
     });
 }
 
-/* HALL INDICATOR (HORIZONTAL) */
+/* =========================
+   HALL INDICATOR
+========================= */
 function createIndicator(stats){
     const wrap = document.createElement("div");
     wrap.className = "hall-indicator";
@@ -128,8 +173,11 @@ function createIndicator(stats){
     return wrap;
 }
 
-/* CREATE BOOTH */
+/* =========================
+   CREATE BOOTH
+========================= */
 function createBooth(id,data){
+
     const el = document.createElement("div");
     el.className = "booth";
     el.innerText = id;
@@ -149,6 +197,7 @@ function createBooth(id,data){
 
     el.classList.add(status);
 
+    /* TYPE STYLE */
     if(type.toLowerCase().includes("space")) el.classList.add("type-space");
     if(type.toLowerCase().includes("shell")) el.classList.add("type-shell");
 
@@ -174,14 +223,18 @@ function createBooth(id,data){
     return el;
 }
 
-/* BLINK */
+/* =========================
+   BLINK EFFECT
+========================= */
 function blink(el){
     document.querySelectorAll(".blink").forEach(x=>x.classList.remove("blink"));
     el.classList.add("blink");
     setTimeout(()=>el.classList.remove("blink"),5000);
 }
 
-/* SEARCH */
+/* =========================
+   SEARCH
+========================= */
 searchBox.addEventListener("input",()=>{
     const val = searchBox.value.toLowerCase();
 
@@ -215,7 +268,9 @@ searchBox.addEventListener("input",()=>{
     });
 });
 
-/* DRAG */
+/* =========================
+   DRAG
+========================= */
 let isDown=false,startX,startY,scrollLeft,scrollTop;
 
 container.addEventListener("mousedown",(e)=>{
@@ -235,19 +290,26 @@ container.addEventListener("mousemove",(e)=>{
     container.scrollTop = scrollTop - (e.pageY-startY);
 });
 
-/* ZOOM */
+/* =========================
+   ZOOM
+========================= */
 document.getElementById("zoomIn").onclick=()=>{
     zoomLevel+=0.1;
     floor.style.transform=`scale(${zoomLevel})`;
 };
+
 document.getElementById("zoomOut").onclick=()=>{
     zoomLevel=Math.max(0.3,zoomLevel-0.1);
     floor.style.transform=`scale(${zoomLevel})`;
 };
 
+/* =========================
+   CLOSE PANEL
+========================= */
 document.addEventListener("click",()=>{
     panel.classList.add("hidden");
     suggestions.style.display="none";
 });
 
+/* INIT */
 loadData();
