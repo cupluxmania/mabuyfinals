@@ -1,0 +1,45 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Expo Floorplan</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>Int'l Hospital Expo @ ICE BSD 2026</header>
+
+<div class="container">
+
+    <div class="searchWrapper">
+        <input type="text" id="searchBox" placeholder="🔍 Search exhibitor or booth..." autocomplete="off">
+        <div id="suggestions"></div>
+    </div>
+
+    <div id="legend">
+        <div><span class="dot available"></span> Available</div>
+        <div><span class="dot sold"></span> Sold</div>
+        <div><span class="dot booked"></span> Booked</div>
+        <div><span class="dot agent"></span> Agent</div>
+    </div>
+
+    <div id="menu">
+        <button id="zoomIn">Zoom In +</button>
+        <button id="zoomOut">Zoom Out -</button>
+    </div>
+
+    <div id="floorContainer">
+        <div id="floor"></div>
+    </div>
+
+</div>
+
+<div id="sidePanel" class="hidden">
+    <h3>Booth Info</h3>
+    <div id="panelContent"></div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
