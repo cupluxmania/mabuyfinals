@@ -11,24 +11,37 @@ let allData = [];
 let zoomLevel = 1;
 let activeFilter = "all";
 
-/* CLEAN */
+/* =========================
+   CLEAN
+========================= */
 function cleanText(val){
     if(!val) return "";
-    return String(val).replace(/\s+/g," ").trim();
+    return String(val).replace(/\u00A0/g," ").replace(/\s+/g," ").trim();
 }
 
-/* STATUS */
+/* =========================
+   NORMALIZE (FOR MATCH ONLY)
+========================= */
+function normalizeId(id){
+    return String(id).replace(/\s+/g,"").toLowerCase();
+}
+
+/* =========================
+   STATUS
+========================= */
 function getStatus(row){
     const s = cleanText(row.status).toLowerCase();
     if(s==="sold") return "sold";
     if(s==="booked") return "booked";
-    if(s==="agent") return "agent";
+    if(s.includes("agent")) return "agent";
     return "available";
 }
 
-/* LOAD DATA */
+/* =========================
+   LOAD DATA (FIXED)
+========================= */
 async function loadData(){
-    const res = await fetch(`${G_SCRIPT_URL}?t=${Date.now()}`);
+    const res = await fetch(`${G_SCRIPT_URL}?cmd=read&t=${Date.now()}`);
     const raw = await res.json();
 
     const expanded = [];
@@ -37,29 +50,34 @@ async function loadData(){
         if(!row.boothid) return;
 
         const booths = String(row.boothid)
+            .replace(/\n/g,"")
             .split(",")
             .map(x=>x.trim())
             .filter(Boolean);
 
-        const size = parseFloat(row.size) || 0;
-        const each = booths.length ? size/booths.length : size;
+        const totalSize = parseFloat(row.size) || 0;
+        const eachSize = booths.length ? totalSize / booths.length : totalSize;
 
         booths.forEach(id=>{
             expanded.push({
-                id,
-                status:getStatus(row),
-                exhibitor:cleanText(row.exhibitor),
-                sqm:each,
-                type:cleanText(row.type)
+                rawId: id, // KEEP ORIGINAL (5035-A)
+                normId: normalizeId(id), // for matching
+                status: getStatus(row),
+                exhibitor: cleanText(row.exhibitor),
+                sqm: eachSize,
+                type: cleanText(row.type)
             });
         });
     });
 
     allData = expanded;
+
     renderFloor();
 }
 
-/* HALL CONFIG */
+/* =========================
+   HALL CONFIG
+========================= */
 const hallConfig = [
   {name:"Hall 5", start:5001, end:5078},
   {name:"Hall 6", start:6001, end:6189},
@@ -69,7 +87,21 @@ const hallConfig = [
   {name:"Hall 10", start:1001, end:1151},
 ];
 
-/* RENDER */
+/* =========================
+   FIND MATCH (FIX CORE BUG)
+========================= */
+function findBooth(id){
+    const norm = normalizeId(id);
+
+    return allData.filter(x =>
+        x.normId === norm ||
+        x.normId.startsWith(norm + "-") // support 5035-A
+    );
+}
+
+/* =========================
+   RENDER
+========================= */
 function renderFloor(){
     floor.innerHTML="";
 
@@ -85,8 +117,7 @@ function renderFloor(){
         grid.className="grid";
 
         for(let i=hall.start;i<=hall.end;i++){
-            const id = String(i);
-            grid.appendChild(createBooth(id));
+            grid.appendChild(createBooth(String(i)));
         }
 
         hallDiv.appendChild(grid);
@@ -94,49 +125,50 @@ function renderFloor(){
     });
 }
 
-/* CREATE BOOTH */
+/* =========================
+   CREATE BOOTH (FIXED)
+========================= */
 function createBooth(id){
 
-    const data = allData.find(x=>x.id===id);
+    const matches = findBooth(id);
 
     const b = document.createElement("div");
-    b.className="booth";
+    b.className="booth available";
 
     let status="available";
     let exhibitor="";
     let sqm=0;
     let type="";
 
-    if(data){
-        status=data.status;
-        exhibitor=data.exhibitor;
-        sqm=data.sqm;
-        type=data.type;
+    if(matches.length){
+
+        if(matches.some(x=>x.status==="agent")) status="agent";
+        else if(matches.some(x=>x.status==="sold")) status="sold";
+        else if(matches.some(x=>x.status==="booked")) status="booked";
+
+        exhibitor = matches.map(x=>x.exhibitor).filter(Boolean).join(", ");
+        sqm = matches[0].sqm;
+        type = matches[0].type;
     }
 
-    b.classList.add(status);
+    b.className = "booth " + status;
 
     // FILTER
     if(activeFilter !== "all" && status !== activeFilter){
         b.classList.add("hidden-booth");
     }
 
-    // TYPE PATTERN (ARSIR)
-    if(type.toLowerCase().includes("space")){
-        b.classList.add("type-space");
-    }
-    if(type.toLowerCase().includes("shell")){
-        b.classList.add("type-shell");
-    }
+    // TYPE ARSIR
+    if(type.toLowerCase().includes("space")) b.classList.add("type-space");
+    if(type.toLowerCase().includes("shell")) b.classList.add("type-shell");
 
-    b.innerText=id;
+    b.innerText = id;
 
-    // HOVER TEXT (CLEAN)
-    b.dataset.tooltip = exhibitor 
+    // TOOLTIP (CLEAN)
+    b.dataset.tooltip = exhibitor
         ? `${exhibitor} [ ${sqm} Sqm ] [ ${type} ]`
         : `AVAILABLE [ ${sqm} Sqm ]`;
 
-    // CLICK PANEL
     b.onclick = (e)=>{
         e.stopPropagation();
 
@@ -153,9 +185,46 @@ function createBooth(id){
     return b;
 }
 
-/* LEGEND FILTER */
+/* =========================
+   SEARCH (FIXED)
+========================= */
+searchBox.addEventListener("input",()=>{
+    const val = searchBox.value.toLowerCase();
+
+    const result = allData.filter(x =>
+        x.rawId.toLowerCase().includes(val) ||
+        (x.exhibitor || "").toLowerCase().includes(val)
+    );
+
+    suggestions.innerHTML="";
+    suggestions.style.display = result.length ? "block":"none";
+
+    result.forEach(x=>{
+        const div = document.createElement("div");
+        div.className="suggestionItem";
+        div.innerText = `${x.rawId} - ${x.exhibitor}`;
+
+        div.onclick=()=>{
+            const el = [...document.querySelectorAll(".booth")]
+                .find(b => b.innerText === x.rawId.split("-")[0]);
+
+            if(el){
+                el.scrollIntoView({behavior:"smooth",block:"center"});
+                el.click();
+            }
+
+            suggestions.style.display="none";
+        };
+
+        suggestions.appendChild(div);
+    });
+});
+
+/* =========================
+   LEGEND FILTER
+========================= */
 document.querySelectorAll(".legend-item").forEach(item=>{
-    item.onclick = ()=>{
+    item.onclick=()=>{
         document.querySelectorAll(".legend-item").forEach(i=>i.classList.remove("active"));
         item.classList.add("active");
 
@@ -164,8 +233,10 @@ document.querySelectorAll(".legend-item").forEach(item=>{
     };
 });
 
-/* DRAG */
-let isDown=false, startX, startY, scrollLeft, scrollTop;
+/* =========================
+   DRAG
+========================= */
+let isDown=false,startX,startY,scrollLeft,scrollTop;
 
 container.addEventListener("mousedown",e=>{
     isDown=true;
@@ -182,12 +253,18 @@ container.addEventListener("mousemove",e=>{
     container.scrollTop = scrollTop-(e.pageY-startY);
 });
 
-/* ZOOM */
+/* =========================
+   ZOOM
+========================= */
 zoomIn.onclick=()=>{zoomLevel+=0.1;floor.style.transform=`scale(${zoomLevel})`;}
 zoomOut.onclick=()=>{zoomLevel=Math.max(0.5,zoomLevel-0.1);floor.style.transform=`scale(${zoomLevel})`;}
 
+/* =========================
+   CLOSE
+========================= */
 document.addEventListener("click",()=>{
     panel.classList.add("hidden");
+    suggestions.style.display="none";
 });
 
 loadData();
