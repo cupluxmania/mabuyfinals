@@ -117,6 +117,7 @@ header {
     cursor: pointer;
     position: relative;
     text-align: center;
+    user-select: none;
 }
 
 /* STATUS COLORS */
