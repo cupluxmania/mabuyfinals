@@ -10,63 +10,76 @@ const panelContent = document.getElementById("panelContent");
 let allData = [];
 let zoomLevel = 1;
 
-/* SAFE CLEAN */
-function clean(v){
-    return (v || "").toString().trim();
+/* =========================
+   CLEAN TEXT
+========================= */
+function cleanText(val) {
+    if (!val) return "";
+    return String(val).replace(/\s+/g, " ").trim();
 }
 
-function norm(id){
-    return clean(id).replace(/\s+/g,"").toLowerCase();
+/* =========================
+   NORMALIZE ID (KEEP -A)
+========================= */
+function normalizeId(id) {
+    return String(id || "").replace(/\s+/g, "").toLowerCase();
 }
 
-/* STATUS */
-function getStatus(row){
-    const s = clean(row.status).toLowerCase();
-    if(["available","sold","booked","agent"].includes(s)) return s;
+/* =========================
+   STATUS
+========================= */
+function getStatus(row) {
+    const s = cleanText(row.status).toLowerCase();
+    if (["available","sold","booked","agent"].includes(s)) return s;
     return "available";
 }
 
-/* LOAD */
-async function loadData(){
-    try{
-        const res = await fetch(G_SCRIPT_URL);
+/* =========================
+   LOAD DATA (SAFE)
+========================= */
+async function loadData() {
+    try {
+        const res = await fetch(G_SCRIPT_URL + "?t=" + Date.now());
         const raw = await res.json();
 
-        allData = [];
+        const expanded = [];
 
-        raw.forEach(row=>{
-            if(!row.boothid) return;
+        raw.forEach(row => {
+            if (!row.boothid) return;
 
             const booths = String(row.boothid)
-                .replace(/\n/g,"")
                 .split(",")
-                .map(x=>x.trim())
+                .map(x => x.trim())
                 .filter(Boolean);
 
             const size = parseFloat(row.size) || 0;
-            const each = booths.length ? size / booths.length : 0;
+            const eachSize = booths.length ? size / booths.length : 0;
 
-            booths.forEach(id=>{
-                allData.push({
-                    boothid: norm(id),
-                    raw: id,
-                    exhibitor: clean(row.exhibitor),
+            booths.forEach(id => {
+                expanded.push({
+                    boothid: normalizeId(id),
+                    display: id.trim(),
+                    exhibitor: cleanText(row.exhibitor),
                     status: getStatus(row),
-                    sqm: each,
-                    type: clean(row.type) || "space"
+                    type: cleanText(row.type) || "Space Only",
+                    sqm: eachSize
                 });
             });
         });
 
+        allData = expanded;
         renderFloor();
 
-    }catch(e){
-        console.error("DATA ERROR", e);
+    } catch (err) {
+        console.error("LOAD ERROR:", err);
+        alert("Data failed to load. Check Apps Script URL.");
     }
 }
 
-/* HALLS */
-const halls = [
+/* =========================
+   HALL CONFIG (UNCHANGED)
+========================= */
+const hallConfig = [
   {name:"Hall 5", start:5001, end:5078},
   {name:"Hall 6", start:6001, end:6189},
   {name:"Hall 7", start:7001, end:7196},
@@ -76,147 +89,147 @@ const halls = [
   {name:"Ambulance", start:"A", end:"Z"}
 ];
 
-/* MATCH (VERY SAFE) */
-function getMatches(id){
-    const n = norm(id);
-    return allData.filter(x =>
-        x.boothid === n ||
-        x.boothid.startsWith(n + "-")
-    );
+/* =========================
+   CREATE BOOTH
+========================= */
+function createBooth(id) {
+    const norm = normalizeId(id);
+
+    const match = allData.find(x => x.boothid === norm);
+
+    const b = document.createElement("div");
+    b.className = "booth";
+
+    if (!match) {
+        b.classList.add("available");
+        b.innerText = id;
+        return b;
+    }
+
+    b.classList.add(match.status);
+
+    // TYPE ARSIR
+    if (match.type.toLowerCase().includes("space")) {
+        b.classList.add("type-space");
+    } else {
+        b.classList.add("type-shell");
+    }
+
+    b.innerText = id;
+
+    // TOOLTIP (clean)
+    b.dataset.tooltip = match.exhibitor
+        ? `${match.exhibitor} [ ${match.sqm} Sqm ] [ ${match.type} ]`
+        : `AVAILABLE [ ${match.sqm} Sqm ]`;
+
+    // CLICK PANEL + BLINK
+    b.onclick = (e) => {
+        e.stopPropagation();
+
+        document.querySelectorAll(".blink").forEach(x => x.classList.remove("blink"));
+        b.classList.add("blink");
+
+        setTimeout(()=> b.classList.remove("blink"), 5000);
+
+        panel.classList.remove("hidden");
+        panelContent.innerHTML = `
+            <b>Booth:</b> ${id}<br>
+            <b>Size:</b> ${match.sqm} Sqm<br>
+            <b>Type:</b> ${match.type}<br>
+            <b>Status:</b> ${match.status.toUpperCase()}<br>
+            <b>Exhibitor:</b> ${match.exhibitor || "-"}
+        `;
+    };
+
+    return b;
 }
 
-/* RENDER */
-function renderFloor(){
+/* =========================
+   RENDER FLOOR (SAFE)
+========================= */
+function renderFloor() {
     floor.innerHTML = "";
 
-    halls.forEach(h=>{
-        const wrap = document.createElement("div");
-        wrap.className = "hall";
+    hallConfig.forEach(hall => {
 
+        const hallDiv = document.createElement("div");
+        hallDiv.className = "hall";
+
+        // HEADER
         const header = document.createElement("div");
         header.className = "hall-header";
 
         const title = document.createElement("h3");
-        title.innerText = h.name;
+        title.innerText = hall.name;
 
-        const indicator = document.createElement("div");
-        indicator.className = "hall-indicator";
+        const summary = document.createElement("div");
+        summary.className = "hall-summary";
 
         const counts = {available:0,sold:0,booked:0,agent:0};
 
         const grid = document.createElement("div");
         grid.className = "grid";
 
-        if(h.name === "Ambulance"){
-            for(let i=65;i<=90;i++){
-                const id = String.fromCharCode(i);
-                const booth = createBooth(id);
-                grid.appendChild(booth);
-                counts[booth.dataset.status]++;
-            }
+        let ids = [];
+
+        if (hall.name === "Ambulance") {
+            for (let i=65;i<=90;i++) ids.push(String.fromCharCode(i));
         } else {
-            for(let i=h.start;i<=h.end;i++){
-                const id = String(i);
-                const booth = createBooth(id);
-                grid.appendChild(booth);
-                counts[booth.dataset.status]++;
-            }
+            for (let i=hall.start;i<=hall.end;i++) ids.push(String(i));
         }
 
+        ids.forEach(id => {
+            const booth = createBooth(id);
+            grid.appendChild(booth);
+
+            const status = booth.classList[1];
+            if (counts[status] !== undefined) counts[status]++;
+        });
+
+        // HORIZONTAL INDICATOR
         ["available","sold","booked","agent"].forEach(s=>{
             const chip = document.createElement("div");
-            chip.className = `chip ${s}`;
-            chip.innerHTML = `<span></span>${counts[s]}`;
-            indicator.appendChild(chip);
+            chip.className = "count-chip";
+            chip.innerHTML = `
+                <span class="dot ${s}"></span>
+                <span>${counts[s]}</span>
+            `;
+            summary.appendChild(chip);
         });
 
         header.appendChild(title);
-        header.appendChild(indicator);
+        header.appendChild(summary);
 
-        wrap.appendChild(header);
-        wrap.appendChild(grid);
+        hallDiv.appendChild(header);
+        hallDiv.appendChild(grid);
 
-        floor.appendChild(wrap);
+        floor.appendChild(hallDiv);
     });
 }
 
-/* CREATE BOOTH */
-function createBooth(id){
-
-    const matches = getMatches(id);
-
-    let status="available";
-    let exhibitor="-";
-    let sqm=0;
-    let type="space";
-
-    if(matches.length){
-        if(matches.some(x=>x.status==="agent")) status="agent";
-        else if(matches.some(x=>x.status==="sold")) status="sold";
-        else if(matches.some(x=>x.status==="booked")) status="booked";
-
-        exhibitor = matches.map(x=>x.exhibitor).filter(Boolean).join(", ");
-        sqm = matches[0].sqm;
-        type = matches[0].type.toLowerCase();
-    }
-
-    const el = document.createElement("div");
-    el.className = `booth ${status}`;
-    el.innerText = id;
-    el.dataset.id = norm(id);
-    el.dataset.status = status;
-
-    if(type.includes("shell")) el.classList.add("type-shell");
-    else el.classList.add("type-space");
-
-    el.dataset.tooltip = `${exhibitor} [ ${sqm} Sqm ] [ ${type} ]`;
-
-    el.onclick = (e)=>{
-        e.stopPropagation();
-        blink(el);
-
-        panel.classList.remove("hidden");
-        panelContent.innerHTML = `
-            <b>Booth:</b> ${id}<br>
-            <b>Size:</b> ${sqm} Sqm<br>
-            <b>Type:</b> ${type}<br>
-            <b>Status:</b> ${status.toUpperCase()}<br>
-            <b>Exhibitor:</b> ${exhibitor}
-        `;
-    };
-
-    return el;
-}
-
-/* BLINK */
-function blink(el){
-    document.querySelectorAll(".blink").forEach(x=>x.classList.remove("blink"));
-    el.classList.add("blink");
-    setTimeout(()=>el.classList.remove("blink"),4000);
-}
-
-/* SEARCH */
-searchBox.addEventListener("input",()=>{
+/* =========================
+   SEARCH
+========================= */
+searchBox.addEventListener("input", () => {
     const val = searchBox.value.toLowerCase();
+    suggestions.innerHTML = "";
 
     const result = allData.filter(x =>
         x.boothid.includes(val) ||
-        x.exhibitor.toLowerCase().includes(val)
+        (x.exhibitor || "").toLowerCase().includes(val)
     );
 
-    suggestions.innerHTML="";
-    suggestions.style.display = result.length ? "block":"none";
+    suggestions.style.display = result.length ? "block" : "none";
 
-    result.slice(0,50).forEach(x=>{
+    result.forEach(x=>{
         const div = document.createElement("div");
-        div.className="suggestionItem";
-        div.innerHTML = `<b>${x.raw}</b> — ${x.exhibitor}`;
+        div.className = "suggestionItem";
+        div.innerHTML = `<b>${x.display}</b><br><small>${x.exhibitor}</small>`;
 
-        div.onclick=()=>{
+        div.onclick = ()=>{
             const el = document.querySelector(`[data-id='${x.boothid}']`);
-            if(el){
+            if (el) {
                 el.scrollIntoView({behavior:"smooth",block:"center"});
-                blink(el);
                 el.click();
             }
         };
@@ -225,10 +238,12 @@ searchBox.addEventListener("input",()=>{
     });
 });
 
-/* DRAG */
+/* =========================
+   DRAG
+========================= */
 let isDown=false,startX,startY,scrollLeft,scrollTop;
 
-container.addEventListener("mousedown",e=>{
+container.addEventListener("mousedown",(e)=>{
     isDown=true;
     startX=e.pageX;
     startY=e.pageY;
@@ -239,19 +254,34 @@ container.addEventListener("mousedown",e=>{
 container.addEventListener("mouseup",()=>isDown=false);
 container.addEventListener("mouseleave",()=>isDown=false);
 
-container.addEventListener("mousemove",e=>{
-    if(!isDown)return;
-    container.scrollLeft = scrollLeft - (e.pageX-startX);
-    container.scrollTop = scrollTop - (e.pageY-startY);
+container.addEventListener("mousemove",(e)=>{
+    if(!isDown) return;
+    container.scrollLeft = scrollLeft - (e.pageX - startX);
+    container.scrollTop = scrollTop - (e.pageY - startY);
 });
 
-/* ZOOM */
-zoomIn.onclick=()=>{ zoomLevel+=0.1; floor.style.transform=`scale(${zoomLevel})`; };
-zoomOut.onclick=()=>{ zoomLevel=Math.max(0.3,zoomLevel-0.1); floor.style.transform=`scale(${zoomLevel})`; };
+/* =========================
+   ZOOM
+========================= */
+document.getElementById("zoomIn").onclick = ()=>{
+    zoomLevel+=0.1;
+    floor.style.transform=`scale(${zoomLevel})`;
+};
 
-document.addEventListener("click",()=>{
+document.getElementById("zoomOut").onclick = ()=>{
+    zoomLevel=Math.max(0.4,zoomLevel-0.1);
+    floor.style.transform=`scale(${zoomLevel})`;
+};
+
+/* =========================
+   CLOSE PANEL
+========================= */
+document.addEventListener("click", ()=>{
     panel.classList.add("hidden");
     suggestions.style.display="none";
 });
 
+/* =========================
+   INIT
+========================= */
 loadData();
