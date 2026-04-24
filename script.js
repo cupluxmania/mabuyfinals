@@ -1,3 +1,4 @@
+// UPDATE THIS with your own latest Web App URL (must end with /exec)
 const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzeXfwbFMaC8WH3th-aw5_PtMGTlz6UHMC5S5tWs9j1FW-G_Fszldy9QqiY5Zps-mFGQg/exec";
 
 const floor = document.getElementById("floor");
@@ -30,7 +31,7 @@ function normalizeId(id) {
 ========================= */
 function getStatus(row) {
     const s = cleanText(row.status).toLowerCase();
-    if (["available","sold","booked","agent"].includes(s)) return s;
+    if (["available", "sold", "booked", "agent"].includes(s)) return s;
     return "available";
 }
 
@@ -40,6 +41,11 @@ function getStatus(row) {
 async function loadData() {
     try {
         const res = await fetch(G_SCRIPT_URL + "?t=" + Date.now());
+
+        if (!res.ok) {
+            throw new Error("HTTP " + res.status + " " + res.statusText);
+        }
+
         const raw = await res.json();
 
         const expanded = [];
@@ -72,12 +78,12 @@ async function loadData() {
 
     } catch (err) {
         console.error("LOAD ERROR:", err);
-        alert("Data failed to load. Check Apps Script URL.");
+        alert("Data failed to load: " + err.message);
     }
 }
 
 /* =========================
-   HALL CONFIG (UNCHANGED)
+   HALL CONFIG
 ========================= */
 const hallConfig = [
   {name:"Hall 5", start:5001, end:5078},
@@ -99,6 +105,9 @@ function createBooth(id) {
 
     const b = document.createElement("div");
     b.className = "booth";
+
+    // for search scrollIntoView
+    b.dataset.id = norm;
 
     if (!match) {
         b.classList.add("available");
@@ -129,7 +138,7 @@ function createBooth(id) {
         document.querySelectorAll(".blink").forEach(x => x.classList.remove("blink"));
         b.classList.add("blink");
 
-        setTimeout(()=> b.classList.remove("blink"), 5000);
+        setTimeout(() => b.classList.remove("blink"), 5000);
 
         panel.classList.remove("hidden");
         panelContent.innerHTML = `
@@ -145,7 +154,7 @@ function createBooth(id) {
 }
 
 /* =========================
-   RENDER FLOOR (SAFE)
+   RENDER FLOOR
 ========================= */
 function renderFloor() {
     floor.innerHTML = "";
@@ -165,7 +174,7 @@ function renderFloor() {
         const summary = document.createElement("div");
         summary.className = "hall-summary";
 
-        const counts = {available:0,sold:0,booked:0,agent:0};
+        const counts = { available: 0, sold: 0, booked: 0, agent: 0 };
 
         const grid = document.createElement("div");
         grid.className = "grid";
@@ -173,9 +182,9 @@ function renderFloor() {
         let ids = [];
 
         if (hall.name === "Ambulance") {
-            for (let i=65;i<=90;i++) ids.push(String.fromCharCode(i));
+            for (let i = 65; i <= 90; i++) ids.push(String.fromCharCode(i));
         } else {
-            for (let i=hall.start;i<=hall.end;i++) ids.push(String(i));
+            for (let i = hall.start; i <= hall.end; i++) ids.push(String(i));
         }
 
         ids.forEach(id => {
@@ -187,7 +196,7 @@ function renderFloor() {
         });
 
         // HORIZONTAL INDICATOR
-        ["available","sold","booked","agent"].forEach(s=>{
+        ["available", "sold", "booked", "agent"].forEach(s => {
             const chip = document.createElement("div");
             chip.className = "count-chip";
             chip.innerHTML = `
@@ -214,6 +223,11 @@ searchBox.addEventListener("input", () => {
     const val = searchBox.value.toLowerCase();
     suggestions.innerHTML = "";
 
+    if (!val) {
+        suggestions.style.display = "none";
+        return;
+    }
+
     const result = allData.filter(x =>
         x.boothid.includes(val) ||
         (x.exhibitor || "").toLowerCase().includes(val)
@@ -221,17 +235,18 @@ searchBox.addEventListener("input", () => {
 
     suggestions.style.display = result.length ? "block" : "none";
 
-    result.forEach(x=>{
+    result.forEach(x => {
         const div = document.createElement("div");
         div.className = "suggestionItem";
         div.innerHTML = `<b>${x.display}</b><br><small>${x.exhibitor}</small>`;
 
-        div.onclick = ()=>{
+        div.onclick = () => {
             const el = document.querySelector(`[data-id='${x.boothid}']`);
             if (el) {
-                el.scrollIntoView({behavior:"smooth",block:"center"});
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
                 el.click();
             }
+            suggestions.style.display = "none";
         };
 
         suggestions.appendChild(div);
@@ -241,21 +256,21 @@ searchBox.addEventListener("input", () => {
 /* =========================
    DRAG
 ========================= */
-let isDown=false,startX,startY,scrollLeft,scrollTop;
+let isDown = false, startX, startY, scrollLeft, scrollTop;
 
-container.addEventListener("mousedown",(e)=>{
-    isDown=true;
-    startX=e.pageX;
-    startY=e.pageY;
-    scrollLeft=container.scrollLeft;
-    scrollTop=container.scrollTop;
+container.addEventListener("mousedown", (e) => {
+    isDown = true;
+    startX = e.pageX;
+    startY = e.pageY;
+    scrollLeft = container.scrollLeft;
+    scrollTop = container.scrollTop;
 });
 
-container.addEventListener("mouseup",()=>isDown=false);
-container.addEventListener("mouseleave",()=>isDown=false);
+container.addEventListener("mouseup", () => isDown = false);
+container.addEventListener("mouseleave", () => isDown = false);
 
-container.addEventListener("mousemove",(e)=>{
-    if(!isDown) return;
+container.addEventListener("mousemove", (e) => {
+    if (!isDown) return;
     container.scrollLeft = scrollLeft - (e.pageX - startX);
     container.scrollTop = scrollTop - (e.pageY - startY);
 });
@@ -263,22 +278,22 @@ container.addEventListener("mousemove",(e)=>{
 /* =========================
    ZOOM
 ========================= */
-document.getElementById("zoomIn").onclick = ()=>{
-    zoomLevel+=0.1;
-    floor.style.transform=`scale(${zoomLevel})`;
+document.getElementById("zoomIn").onclick = () => {
+    zoomLevel += 0.1;
+    floor.style.transform = `scale(${zoomLevel})`;
 };
 
-document.getElementById("zoomOut").onclick = ()=>{
-    zoomLevel=Math.max(0.4,zoomLevel-0.1);
-    floor.style.transform=`scale(${zoomLevel})`;
+document.getElementById("zoomOut").onclick = () => {
+    zoomLevel = Math.max(0.4, zoomLevel - 0.1);
+    floor.style.transform = `scale(${zoomLevel})`;
 };
 
 /* =========================
    CLOSE PANEL
 ========================= */
-document.addEventListener("click", ()=>{
+document.addEventListener("click", () => {
     panel.classList.add("hidden");
-    suggestions.style.display="none";
+    suggestions.style.display = "none";
 });
 
 /* =========================
