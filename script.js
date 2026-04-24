@@ -10,63 +10,62 @@ const panelContent = document.getElementById("panelContent");
 let allData = [];
 let zoomLevel = 1;
 
-/* CLEAN */
-function cleanText(val){
-    return (val || "").toString().trim();
+/* SAFE CLEAN */
+function clean(v){
+    return (v || "").toString().trim();
 }
 
-function normalizeId(id){
-    return (id || "").toString().replace(/\s+/g,"").toLowerCase();
+function norm(id){
+    return clean(id).replace(/\s+/g,"").toLowerCase();
 }
 
 /* STATUS */
 function getStatus(row){
-    const s = cleanText(row.status).toLowerCase();
+    const s = clean(row.status).toLowerCase();
     if(["available","sold","booked","agent"].includes(s)) return s;
     return "available";
 }
 
-/* LOAD DATA */
+/* LOAD */
 async function loadData(){
     try{
-        const res = await fetch(`${G_SCRIPT_URL}?t=${Date.now()}`);
+        const res = await fetch(G_SCRIPT_URL);
         const raw = await res.json();
 
-        const expanded = [];
+        allData = [];
 
         raw.forEach(row=>{
             if(!row.boothid) return;
 
             const booths = String(row.boothid)
+                .replace(/\n/g,"")
                 .split(",")
-                .map(x=>x.replace(/\n/g,"").trim())
+                .map(x=>x.trim())
                 .filter(Boolean);
 
-            const count = booths.length;
-            const totalSize = parseFloat(row.size) || 0;
-            const eachSize = count ? totalSize / count : 0;
+            const size = parseFloat(row.size) || 0;
+            const each = booths.length ? size / booths.length : 0;
 
             booths.forEach(id=>{
-                expanded.push({
-                    boothid: normalizeId(id),
-                    displayId: id,
-                    exhibitor: cleanText(row.exhibitor),
+                allData.push({
+                    boothid: norm(id),
+                    raw: id,
+                    exhibitor: clean(row.exhibitor),
                     status: getStatus(row),
-                    sqm: eachSize,
-                    type: cleanText(row.type) || "space"
+                    sqm: each,
+                    type: clean(row.type) || "space"
                 });
             });
         });
 
-        allData = expanded;
         renderFloor();
 
-    }catch(err){
-        console.error("LOAD ERROR:", err);
+    }catch(e){
+        console.error("DATA ERROR", e);
     }
 }
 
-/* HALL CONFIG */
+/* HALLS */
 const halls = [
   {name:"Hall 5", start:5001, end:5078},
   {name:"Hall 6", start:6001, end:6189},
@@ -77,13 +76,22 @@ const halls = [
   {name:"Ambulance", start:"A", end:"Z"}
 ];
 
+/* MATCH (VERY SAFE) */
+function getMatches(id){
+    const n = norm(id);
+    return allData.filter(x =>
+        x.boothid === n ||
+        x.boothid.startsWith(n + "-")
+    );
+}
+
 /* RENDER */
 function renderFloor(){
     floor.innerHTML = "";
 
     halls.forEach(h=>{
-        const hallDiv = document.createElement("div");
-        hallDiv.className = "hall";
+        const wrap = document.createElement("div");
+        wrap.className = "hall";
 
         const header = document.createElement("div");
         header.className = "hall-header";
@@ -109,28 +117,7 @@ function renderFloor(){
         } else {
             for(let i=h.start;i<=h.end;i++){
                 const id = String(i);
-
-                const matches = allData.filter(x =>
-                    x.boothid === normalizeId(id) ||
-                    x.boothid.startsWith(normalizeId(id)+"-")
-                );
-
-                let data = null;
-
-                if(matches.length){
-                    data = {
-                        status:
-                            matches.some(x=>x.status==="agent") ? "agent" :
-                            matches.some(x=>x.status==="sold") ? "sold" :
-                            matches.some(x=>x.status==="booked") ? "booked" : "available",
-
-                        exhibitor: matches.map(x=>x.exhibitor).filter(Boolean).join(", "),
-                        sqm: matches[0].sqm,
-                        type: matches[0].type
-                    };
-                }
-
-                const booth = createBooth(id, data);
+                const booth = createBooth(id);
                 grid.appendChild(booth);
                 counts[booth.dataset.status]++;
             }
@@ -146,31 +133,38 @@ function renderFloor(){
         header.appendChild(title);
         header.appendChild(indicator);
 
-        hallDiv.appendChild(header);
-        hallDiv.appendChild(grid);
+        wrap.appendChild(header);
+        wrap.appendChild(grid);
 
-        floor.appendChild(hallDiv);
+        floor.appendChild(wrap);
     });
 }
 
 /* CREATE BOOTH */
-function createBooth(id,data){
-    const el = document.createElement("div");
-    el.className = "booth";
-    el.innerText = id;
-    el.dataset.id = normalizeId(id);
+function createBooth(id){
 
-    let status="available", exhibitor="-", sqm=0, type="space";
+    const matches = getMatches(id);
 
-    if(data){
-        status = data.status;
-        exhibitor = data.exhibitor;
-        sqm = data.sqm;
-        type = (data.type || "").toLowerCase();
+    let status="available";
+    let exhibitor="-";
+    let sqm=0;
+    let type="space";
+
+    if(matches.length){
+        if(matches.some(x=>x.status==="agent")) status="agent";
+        else if(matches.some(x=>x.status==="sold")) status="sold";
+        else if(matches.some(x=>x.status==="booked")) status="booked";
+
+        exhibitor = matches.map(x=>x.exhibitor).filter(Boolean).join(", ");
+        sqm = matches[0].sqm;
+        type = matches[0].type.toLowerCase();
     }
 
+    const el = document.createElement("div");
+    el.className = `booth ${status}`;
+    el.innerText = id;
+    el.dataset.id = norm(id);
     el.dataset.status = status;
-    el.classList.add(status);
 
     if(type.includes("shell")) el.classList.add("type-shell");
     else el.classList.add("type-space");
@@ -179,7 +173,6 @@ function createBooth(id,data){
 
     el.onclick = (e)=>{
         e.stopPropagation();
-
         blink(el);
 
         panel.classList.remove("hidden");
@@ -208,25 +201,24 @@ searchBox.addEventListener("input",()=>{
 
     const result = allData.filter(x =>
         x.boothid.includes(val) ||
-        (x.exhibitor || "").toLowerCase().includes(val)
+        x.exhibitor.toLowerCase().includes(val)
     );
 
     suggestions.innerHTML="";
     suggestions.style.display = result.length ? "block":"none";
 
-    result.forEach(x=>{
+    result.slice(0,50).forEach(x=>{
         const div = document.createElement("div");
-        div.className = "suggestionItem";
-        div.innerHTML = `<b>${x.displayId}</b> — ${x.exhibitor}`;
+        div.className="suggestionItem";
+        div.innerHTML = `<b>${x.raw}</b> — ${x.exhibitor}`;
 
-        div.onclick = ()=>{
+        div.onclick=()=>{
             const el = document.querySelector(`[data-id='${x.boothid}']`);
             if(el){
                 el.scrollIntoView({behavior:"smooth",block:"center"});
                 blink(el);
                 el.click();
             }
-            suggestions.style.display="none";
         };
 
         suggestions.appendChild(div);
@@ -236,7 +228,7 @@ searchBox.addEventListener("input",()=>{
 /* DRAG */
 let isDown=false,startX,startY,scrollLeft,scrollTop;
 
-container.addEventListener("mousedown",(e)=>{
+container.addEventListener("mousedown",e=>{
     isDown=true;
     startX=e.pageX;
     startY=e.pageY;
@@ -247,8 +239,8 @@ container.addEventListener("mousedown",(e)=>{
 container.addEventListener("mouseup",()=>isDown=false);
 container.addEventListener("mouseleave",()=>isDown=false);
 
-container.addEventListener("mousemove",(e)=>{
-    if(!isDown) return;
+container.addEventListener("mousemove",e=>{
+    if(!isDown)return;
     container.scrollLeft = scrollLeft - (e.pageX-startX);
     container.scrollTop = scrollTop - (e.pageY-startY);
 });
