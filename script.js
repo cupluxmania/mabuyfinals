@@ -40,7 +40,7 @@ function getStatus(row) {
 ========================= */
 async function loadData() {
     try {
-        const res = await fetch(G_SCRIPT_URL + "?t=" + Date.now());
+        const res = await fetch(`${G_SCRIPT_URL}?cmd=read&t=${Date.now()}`);
 
         if (!res.ok) {
             throw new Error("HTTP " + res.status + " " + res.statusText);
