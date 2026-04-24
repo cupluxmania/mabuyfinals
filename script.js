@@ -10,39 +10,25 @@ const panelContent = document.getElementById("panelContent");
 let allData = [];
 let zoomLevel = 1;
 
-/* =========================
-   CLEAN TEXT
-========================= */
+/* CLEAN */
 function cleanText(val){
-    if(!val) return "";
-    return String(val).replace(/\s+/g," ").trim();
+    return (val || "").toString().trim();
 }
 
-/* =========================
-   NORMALIZE ID
-========================= */
 function normalizeId(id){
-    return String(id || "")
-        .replace(/\u00A0/g, "")
-        .replace(/\s+/g, "")
-        .trim()
-        .toLowerCase();
+    return (id || "").toString().replace(/\s+/g,"").toLowerCase();
 }
 
-/* =========================
-   STATUS
-========================= */
+/* STATUS */
 function getStatus(row){
-    let s = cleanText(row.status).toLowerCase();
+    const s = cleanText(row.status).toLowerCase();
     if(["available","sold","booked","agent"].includes(s)) return s;
     return "available";
 }
 
-/* =========================
-   LOAD DATA
-========================= */
+/* LOAD DATA */
 async function loadData(){
-    try {
+    try{
         const res = await fetch(`${G_SCRIPT_URL}?t=${Date.now()}`);
         const raw = await res.json();
 
@@ -57,17 +43,17 @@ async function loadData(){
                 .filter(Boolean);
 
             const count = booths.length;
-            const size = parseFloat(row.size) || 0;
-            const eachSize = count ? size / count : 0;
+            const totalSize = parseFloat(row.size) || 0;
+            const eachSize = count ? totalSize / count : 0;
 
             booths.forEach(id=>{
                 expanded.push({
                     boothid: normalizeId(id),
-                    displayId: id.trim(),
+                    displayId: id,
                     exhibitor: cleanText(row.exhibitor),
                     status: getStatus(row),
                     sqm: eachSize,
-                    type: cleanText(row.type) || "-"
+                    type: cleanText(row.type) || "space"
                 });
             });
         });
@@ -75,30 +61,27 @@ async function loadData(){
         allData = expanded;
         renderFloor();
 
-    } catch(err){
+    }catch(err){
         console.error("LOAD ERROR:", err);
     }
 }
 
-/* =========================
-   HALL CONFIG
-========================= */
-const hallConfig = [
+/* HALL CONFIG */
+const halls = [
   {name:"Hall 5", start:5001, end:5078},
   {name:"Hall 6", start:6001, end:6189},
   {name:"Hall 7", start:7001, end:7196},
   {name:"Hall 8", start:8001, end:8181},
   {name:"Hall 9", start:9001, end:9191},
-  {name:"Hall 10", start:1001, end:1151}
+  {name:"Hall 10", start:1001, end:1151},
+  {name:"Ambulance", start:"A", end:"Z"}
 ];
 
-/* =========================
-   RENDER FLOOR
-========================= */
+/* RENDER */
 function renderFloor(){
     floor.innerHTML = "";
 
-    hallConfig.forEach(hall=>{
+    halls.forEach(h=>{
         const hallDiv = document.createElement("div");
         hallDiv.className = "hall";
 
@@ -106,48 +89,62 @@ function renderFloor(){
         header.className = "hall-header";
 
         const title = document.createElement("h3");
-        title.innerText = hall.name;
+        title.innerText = h.name;
 
-        const stats = {available:0,sold:0,booked:0,agent:0};
+        const indicator = document.createElement("div");
+        indicator.className = "hall-indicator";
+
+        const counts = {available:0,sold:0,booked:0,agent:0};
 
         const grid = document.createElement("div");
         grid.className = "grid";
 
-        for(let i=hall.start;i<=hall.end;i++){
-
-            const id = String(i);
-
-            /* 🔥 FIXED MATCH LOGIC */
-            const matches = allData.filter(x =>
-                x.boothid === normalizeId(id) ||
-                x.boothid.startsWith(normalizeId(id) + "-")
-            );
-
-            let data = null;
-
-            if(matches.length){
-                data = {
-                    status:
-                        matches.some(x=>x.status==="agent") ? "agent" :
-                        matches.some(x=>x.status==="sold") ? "sold" :
-                        matches.some(x=>x.status==="booked") ? "booked" : "available",
-
-                    exhibitor: matches.map(x=>x.exhibitor).filter(Boolean).join(", "),
-                    sqm: matches[0].sqm,
-                    type: matches[0].type
-                };
-
-                stats[data.status]++;
-            } else {
-                stats.available++;
+        if(h.name === "Ambulance"){
+            for(let i=65;i<=90;i++){
+                const id = String.fromCharCode(i);
+                const booth = createBooth(id);
+                grid.appendChild(booth);
+                counts[booth.dataset.status]++;
             }
+        } else {
+            for(let i=h.start;i<=h.end;i++){
+                const id = String(i);
 
-            const booth = createBooth(id, data);
-            grid.appendChild(booth);
+                const matches = allData.filter(x =>
+                    x.boothid === normalizeId(id) ||
+                    x.boothid.startsWith(normalizeId(id)+"-")
+                );
+
+                let data = null;
+
+                if(matches.length){
+                    data = {
+                        status:
+                            matches.some(x=>x.status==="agent") ? "agent" :
+                            matches.some(x=>x.status==="sold") ? "sold" :
+                            matches.some(x=>x.status==="booked") ? "booked" : "available",
+
+                        exhibitor: matches.map(x=>x.exhibitor).filter(Boolean).join(", "),
+                        sqm: matches[0].sqm,
+                        type: matches[0].type
+                    };
+                }
+
+                const booth = createBooth(id, data);
+                grid.appendChild(booth);
+                counts[booth.dataset.status]++;
+            }
         }
 
+        ["available","sold","booked","agent"].forEach(s=>{
+            const chip = document.createElement("div");
+            chip.className = `chip ${s}`;
+            chip.innerHTML = `<span></span>${counts[s]}`;
+            indicator.appendChild(chip);
+        });
+
         header.appendChild(title);
-        header.appendChild(createIndicator(stats));
+        header.appendChild(indicator);
 
         hallDiv.appendChild(header);
         hallDiv.appendChild(grid);
@@ -156,55 +153,30 @@ function renderFloor(){
     });
 }
 
-/* =========================
-   HALL INDICATOR
-========================= */
-function createIndicator(stats){
-    const wrap = document.createElement("div");
-    wrap.className = "hall-indicator";
-
-    ["available","sold","booked","agent"].forEach(s=>{
-        const item = document.createElement("div");
-        item.className = `indicator-item ${s}`;
-        item.innerHTML = `<span></span>${stats[s]}`;
-        wrap.appendChild(item);
-    });
-
-    return wrap;
-}
-
-/* =========================
-   CREATE BOOTH
-========================= */
+/* CREATE BOOTH */
 function createBooth(id,data){
-
     const el = document.createElement("div");
     el.className = "booth";
     el.innerText = id;
     el.dataset.id = normalizeId(id);
 
-    let status = "available";
-    let exhibitor = "-";
-    let sqm = 0;
-    let type = "-";
+    let status="available", exhibitor="-", sqm=0, type="space";
 
     if(data){
         status = data.status;
-        exhibitor = data.exhibitor || "-";
+        exhibitor = data.exhibitor;
         sqm = data.sqm;
-        type = data.type;
+        type = (data.type || "").toLowerCase();
     }
 
+    el.dataset.status = status;
     el.classList.add(status);
 
-    /* TYPE STYLE */
-    if(type.toLowerCase().includes("space")) el.classList.add("type-space");
-    if(type.toLowerCase().includes("shell")) el.classList.add("type-shell");
+    if(type.includes("shell")) el.classList.add("type-shell");
+    else el.classList.add("type-space");
 
-    /* TOOLTIP */
     el.dataset.tooltip = `${exhibitor} [ ${sqm} Sqm ] [ ${type} ]`;
 
-    /* CLICK */
     el.onclick = (e)=>{
         e.stopPropagation();
 
@@ -223,18 +195,14 @@ function createBooth(id,data){
     return el;
 }
 
-/* =========================
-   BLINK EFFECT
-========================= */
+/* BLINK */
 function blink(el){
     document.querySelectorAll(".blink").forEach(x=>x.classList.remove("blink"));
     el.classList.add("blink");
-    setTimeout(()=>el.classList.remove("blink"),5000);
+    setTimeout(()=>el.classList.remove("blink"),4000);
 }
 
-/* =========================
-   SEARCH
-========================= */
+/* SEARCH */
 searchBox.addEventListener("input",()=>{
     const val = searchBox.value.toLowerCase();
 
@@ -249,10 +217,7 @@ searchBox.addEventListener("input",()=>{
     result.forEach(x=>{
         const div = document.createElement("div");
         div.className = "suggestionItem";
-        div.innerHTML = `
-            <strong>${x.displayId}</strong>
-            <span>${x.exhibitor}</span>
-        `;
+        div.innerHTML = `<b>${x.displayId}</b> — ${x.exhibitor}`;
 
         div.onclick = ()=>{
             const el = document.querySelector(`[data-id='${x.boothid}']`);
@@ -268,9 +233,7 @@ searchBox.addEventListener("input",()=>{
     });
 });
 
-/* =========================
-   DRAG
-========================= */
+/* DRAG */
 let isDown=false,startX,startY,scrollLeft,scrollTop;
 
 container.addEventListener("mousedown",(e)=>{
@@ -290,26 +253,13 @@ container.addEventListener("mousemove",(e)=>{
     container.scrollTop = scrollTop - (e.pageY-startY);
 });
 
-/* =========================
-   ZOOM
-========================= */
-document.getElementById("zoomIn").onclick=()=>{
-    zoomLevel+=0.1;
-    floor.style.transform=`scale(${zoomLevel})`;
-};
+/* ZOOM */
+zoomIn.onclick=()=>{ zoomLevel+=0.1; floor.style.transform=`scale(${zoomLevel})`; };
+zoomOut.onclick=()=>{ zoomLevel=Math.max(0.3,zoomLevel-0.1); floor.style.transform=`scale(${zoomLevel})`; };
 
-document.getElementById("zoomOut").onclick=()=>{
-    zoomLevel=Math.max(0.3,zoomLevel-0.1);
-    floor.style.transform=`scale(${zoomLevel})`;
-};
-
-/* =========================
-   CLOSE PANEL
-========================= */
 document.addEventListener("click",()=>{
     panel.classList.add("hidden");
     suggestions.style.display="none";
 });
 
-/* INIT */
 loadData();
