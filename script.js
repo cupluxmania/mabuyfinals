@@ -27,6 +27,13 @@ function normalizeId(id) {
 }
 
 /* =========================
+   FORMAT DISPLAY ID (-a to -A)
+========================= */
+function formatDisplayId(id) {
+    return id.replace(/-([a-z])$/, (_, c) => "-" + c.toUpperCase());
+}
+
+/* =========================
    GET VARIANTS (for -A, -B, etc)
 ========================= */
 function getVariants(baseId) {
@@ -108,6 +115,7 @@ const hallConfig = [
 ========================= */
 function createBooth(id) {
     const norm = normalizeId(id);
+    const displayId = formatDisplayId(id);
 
     const match = allData.find(x => x.boothid === norm);
 
@@ -119,7 +127,7 @@ function createBooth(id) {
 
     if (!match) {
         b.classList.add("available");
-        b.innerText = id;
+        b.innerText = displayId;
         return b;
     }
 
@@ -132,25 +140,25 @@ function createBooth(id) {
         b.classList.add("type-shell");
     }
 
-    b.innerText = id;
+    b.innerText = displayId;
 
     // TOOLTIP (clean)
     b.dataset.tooltip = match.exhibitor
         ? `${match.exhibitor} [ ${match.sqm} Sqm ] [ ${match.type} ]`
         : `AVAILABLE [ ${match.sqm} Sqm ]`;
 
-    // CLICK PANEL + BLINK
+    // CLICK PANEL + BLINK + HIGHLIGHT
     b.onclick = (e) => {
         e.stopPropagation();
 
-        document.querySelectorAll(".blink").forEach(x => x.classList.remove("blink"));
-        b.classList.add("blink");
+        document.querySelectorAll(".highlight, .blink").forEach(x => x.classList.remove("highlight", "blink"));
+        b.classList.add("highlight", "blink");
 
-        setTimeout(() => b.classList.remove("blink"), 5000);
+        setTimeout(() => b.classList.remove("highlight", "blink"), 5000);
 
         panel.classList.remove("hidden");
         panelContent.innerHTML = `
-            <b>Booth:</b> ${id}<br>
+            <b>Booth:</b> ${displayId}<br>
             <b>Size:</b> ${match.sqm} Sqm<br>
             <b>Type:</b> ${match.type}<br>
             <b>Status:</b> ${match.status.toUpperCase()}<br>
@@ -255,12 +263,15 @@ searchBox.addEventListener("input", () => {
     result.forEach(x => {
         const div = document.createElement("div");
         div.className = "suggestionItem";
-        div.innerHTML = `<b>${x.display}</b><br><small>${x.exhibitor}</small>`;
+        div.innerHTML = `<b>${formatDisplayId(x.display)}</b><br><small>${x.exhibitor}</small>`;
 
         div.onclick = () => {
             const el = document.querySelector(`[data-id='${x.boothid}']`);
             if (el) {
                 el.scrollIntoView({ behavior: "smooth", block: "center" });
+                document.querySelectorAll(".highlight, .blink").forEach(b => b.classList.remove("highlight", "blink"));
+                el.classList.add("highlight", "blink");
+                setTimeout(() => el.classList.remove("highlight", "blink"), 5000);
                 el.click();
             }
             suggestions.style.display = "none";
