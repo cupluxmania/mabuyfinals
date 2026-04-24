@@ -171,7 +171,7 @@ header {
     100% { box-shadow: 0 0 0 0 rgba(255,255,0,0); }
 }
 .blink {
-    animation: blink 5s infinite;
+    animation: blink 5s ease-in-out infinite;
 }
 
 /* HALL */
