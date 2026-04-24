@@ -27,6 +27,14 @@ function normalizeId(id) {
 }
 
 /* =========================
+   GET VARIANTS (for -A, -B, etc)
+========================= */
+function getVariants(baseId) {
+    const normalized = normalizeId(baseId);
+    return allData.filter(x => normalizeId(x.boothid).startsWith(normalized + "-"));
+}
+
+/* =========================
    STATUS
 ========================= */
 function getStatus(row) {
@@ -188,11 +196,20 @@ function renderFloor() {
         }
 
         ids.forEach(id => {
-            const booth = createBooth(id);
-            grid.appendChild(booth);
-
-            const status = booth.classList[1];
-            if (counts[status] !== undefined) counts[status]++;
+            const variants = getVariants(String(id));
+            if (variants.length > 0) {
+                variants.forEach(v => {
+                    const booth = createBooth(v.boothid);
+                    grid.appendChild(booth);
+                    const status = booth.classList[1];
+                    if (counts[status] !== undefined) counts[status]++;
+                });
+            } else {
+                const booth = createBooth(id);
+                grid.appendChild(booth);
+                const status = booth.classList[1];
+                if (counts[status] !== undefined) counts[status]++;
+            }
         });
 
         // HORIZONTAL INDICATOR
