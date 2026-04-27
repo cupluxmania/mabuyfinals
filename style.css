@@ -4,7 +4,6 @@ body {
     background: #eef2f7;
 }
 
-/* HEADER */
 header {
     padding: 12px;
     background: #111827;
@@ -28,7 +27,6 @@ header {
     border: 1px solid #ccc;
 }
 
-/* SUGGESTION */
 #suggestions {
     position: absolute;
     top: 45px;
@@ -40,6 +38,7 @@ header {
     max-height: 250px;
     overflow-y: auto;
     box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
 }
 
 .suggestionItem {
@@ -52,7 +51,7 @@ header {
     background: #f3f4f6;
 }
 
-/* LEGEND */
+/* ✅ LEGEND */
 #legend {
     display: flex;
     flex-wrap: wrap;
@@ -71,6 +70,7 @@ header {
     display: flex;
     align-items: center;
     gap: 6px;
+    user-select: none;
 }
 
 .legend-item.active {
@@ -89,16 +89,15 @@ header {
 .booked { background: #eab308; }
 .agent { background: #22c55e; }
 
-.box {
-    width: 14px;
-    height: 14px;
-}
-
 .box.shell {
-    border: 3px solid #000;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #111;
 }
 
 .box.space {
+    width: 12px;
+    height: 12px;
     background: repeating-linear-gradient(45deg,#0002,#0002 4px,transparent 4px,transparent 8px);
 }
 
@@ -107,19 +106,30 @@ header {
     height: 75vh;
     overflow: auto;
     background: #e5e7eb;
+    cursor: grab;
+}
+
+#floorContainer:active {
+    cursor: grabbing;
 }
 
 #floor {
     display: flex;
-    gap: 120px;
+    gap: 100px;
     padding: 100px;
+    transform-origin: top left;
 }
 
 /* HALL */
+.hall {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 .hall-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 10px;
 }
 
 .hall-summary {
@@ -153,10 +163,10 @@ header {
     justify-content: center;
     align-items: center;
     cursor: pointer;
+    position: relative;
     user-select: none;
 }
 
-/* TYPE */
 .type-space {
     background-image: repeating-linear-gradient(45deg,#fff3,#fff3 6px,transparent 6px,transparent 12px);
 }
@@ -170,20 +180,21 @@ header {
     content: attr(data-tooltip);
     position: absolute;
     bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
     background: black;
     color: white;
     padding: 5px;
     border-radius: 5px;
     font-size: 11px;
+    white-space: nowrap;
 }
 
 /* BLINK */
 @keyframes blink {
     50% { box-shadow: 0 0 20px yellow; }
 }
-.blink {
-    animation: blink 1s infinite;
-}
+.blink { animation: blink 1s infinite; }
 
 /* PANEL */
 #sidePanel {
@@ -194,5 +205,4 @@ header {
     padding: 15px;
     width: 250px;
 }
-
 .hidden { display:none; }
