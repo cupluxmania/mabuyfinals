@@ -9,30 +9,75 @@ const panelContent = document.getElementById("panelContent");
 
 let allData = [];
 let zoomLevel = 1;
-let activeFilters = ["available","sold","booked","agent"];
 
-/* LOAD DATA (UNCHANGED CORE) */
+/* =========================
+   CLEAN TEXT
+========================= */
+function cleanText(val) {
+    if (!val) return "";
+    return String(val).replace(/\s+/g, " ").trim();
+}
+
+/* =========================
+   NORMALIZE ID
+========================= */
+function normalizeId(id) {
+    return String(id || "").replace(/\s+/g, "").toLowerCase();
+}
+
+/* =========================
+   STATUS
+========================= */
+function getStatus(row) {
+    const s = cleanText(row.status).toLowerCase();
+    if (["available","sold","booked","agent"].includes(s)) return s;
+    return "available";
+}
+
+/* =========================
+   LOAD DATA (FIXED 100%)
+========================= */
 async function loadData() {
     try {
-        const res = await fetch(`${G_SCRIPT_URL}?t=${Date.now()}`);
-        const raw = await res.json();
+        const res = await fetch(`${G_SCRIPT_URL}?cmd=read&t=${Date.now()}`);
+
+        console.log("HTTP STATUS:", res.status);
+
+        const text = await res.text();
+
+        console.log("RAW RESPONSE:", text);
+
+        // ❌ If Apps Script returns HTML or empty
+        if (!text || text.startsWith("<")) {
+            throw new Error("Invalid response (HTML or empty)");
+        }
+
+        let raw;
+        try {
+            raw = JSON.parse(text);
+        } catch (e) {
+            throw new Error("Response is not valid JSON");
+        }
 
         const expanded = [];
 
-        raw.forEach(r => {
-            if (!r.boothid) return;
+        raw.forEach(row => {
+            if (!row.boothid) return;
 
-            const booths = r.boothid.split(",").map(x => x.trim());
-            const size = parseFloat(r.size) || 0;
+            const booths = String(row.boothid)
+                .split(",")
+                .map(x => x.trim())
+                .filter(Boolean);
+
+            const size = parseFloat(row.size) || 0;
             const each = booths.length ? size / booths.length : 0;
 
             booths.forEach(id => {
                 expanded.push({
-                    boothid: id.toLowerCase(),
+                    boothid: normalizeId(id),
                     display: id,
-                    exhibitor: r.exhibitor || "",
-                    status: (r.status || "available").toLowerCase(),
-                    type: r.type || "Space Only",
+                    exhibitor: cleanText(row.exhibitor),
+                    status: getStatus(row),
                     sqm: each
                 });
             });
@@ -41,19 +86,35 @@ async function loadData() {
         allData = expanded;
         renderFloor();
 
-    } catch (e) {
-        alert("Data failed to load.");
-        console.error(e);
+    } catch (err) {
+        console.error("LOAD ERROR:", err);
+        alert("❌ Data failed to load\n" + err.message);
     }
 }
 
-/* CREATE BOOTH */
+/* =========================
+   HALL CONFIG
+========================= */
+const hallConfig = [
+  {name:"Hall 5", start:5001, end:5078},
+  {name:"Hall 6", start:6001, end:6189},
+  {name:"Hall 7", start:7001, end:7196},
+  {name:"Hall 8", start:8001, end:8181},
+  {name:"Hall 9", start:9001, end:9191},
+  {name:"Hall 10", start:1001, end:1151},
+  {name:"Ambulance", start:"A", end:"Z"}
+];
+
+/* =========================
+   CREATE BOOTH
+========================= */
 function createBooth(id) {
-    const match = allData.find(x => x.boothid === id.toLowerCase());
+    const norm = normalizeId(id);
+    const match = allData.find(x => x.boothid === norm);
 
     const b = document.createElement("div");
     b.className = "booth";
-    b.dataset.id = id.toLowerCase();
+    b.dataset.id = norm;
 
     if (!match) {
         b.classList.add("available");
@@ -62,49 +123,42 @@ function createBooth(id) {
     }
 
     b.classList.add(match.status);
-
-    if (match.type.toLowerCase().includes("space")) b.classList.add("type-space");
-    else b.classList.add("type-shell");
-
-    b.innerText = match.display;
+    b.innerText = id;
 
     b.dataset.tooltip = match.exhibitor
-        ? `${match.exhibitor} [ ${match.sqm} Sqm ] [ ${match.type} ]`
-        : `AVAILABLE [ ${match.sqm} Sqm ]`;
+        ? `${match.exhibitor} • ${match.sqm} Sqm`
+        : `AVAILABLE • ${match.sqm} Sqm`;
 
     b.onclick = (e) => {
         e.stopPropagation();
 
-        document.querySelectorAll(".blink").forEach(x => x.classList.remove("blink"));
-        b.classList.add("blink");
+        document.querySelectorAll(".highlight, .blink")
+            .forEach(x => x.classList.remove("highlight","blink"));
+
+        b.classList.add("highlight","blink");
+
+        setTimeout(() => b.classList.remove("highlight","blink"), 5000);
 
         panel.classList.remove("hidden");
         panelContent.innerHTML = `
-            Booth: ${match.display}<br>
-            Size: ${match.sqm} Sqm<br>
-            Type: ${match.type}<br>
-            Status: ${match.status}<br>
-            Exhibitor: ${match.exhibitor}
+            <b>Booth:</b> ${id}<br>
+            <b>Size:</b> ${match.sqm} Sqm<br>
+            <b>Status:</b> ${match.status.toUpperCase()}<br>
+            <b>Exhibitor:</b> ${match.exhibitor || "-"}
         `;
     };
 
     return b;
 }
 
-/* RENDER FLOOR (UNCHANGED STRUCTURE) */
+/* =========================
+   RENDER FLOOR
+========================= */
 function renderFloor() {
     floor.innerHTML = "";
 
-    const halls = [
-        {name:"Hall 5", start:5001, end:5078},
-        {name:"Hall 6", start:6001, end:6189},
-        {name:"Hall 7", start:7001, end:7196},
-        {name:"Hall 8", start:8001, end:8181},
-        {name:"Hall 9", start:9001, end:9191},
-        {name:"Hall 10", start:1001, end:1151}
-    ];
+    hallConfig.forEach(hall => {
 
-    halls.forEach(h => {
         const hallDiv = document.createElement("div");
         hallDiv.className = "hall";
 
@@ -112,7 +166,7 @@ function renderFloor() {
         header.className = "hall-header";
 
         const title = document.createElement("h3");
-        title.innerText = h.name;
+        title.innerText = hall.name;
 
         const summary = document.createElement("div");
         summary.className = "hall-summary";
@@ -122,71 +176,44 @@ function renderFloor() {
         const grid = document.createElement("div");
         grid.className = "grid";
 
-        for (let i = h.start; i <= h.end; i++) {
-            const booth = createBooth(String(i));
+        let ids = [];
+
+        if (hall.name === "Ambulance") {
+            for (let i=65;i<=90;i++) ids.push(String.fromCharCode(i));
+        } else {
+            for (let i=hall.start;i<=hall.end;i++) ids.push(String(i));
+        }
+
+        ids.forEach(id => {
+            const booth = createBooth(id);
             grid.appendChild(booth);
 
             const s = booth.classList[1];
-            if (counts[s] !== undefined) counts[s]++;
-        }
+            if(counts[s] !== undefined) counts[s]++;
+        });
 
         ["available","sold","booked","agent"].forEach(s=>{
             const chip = document.createElement("div");
             chip.className="count-chip";
-            chip.innerHTML=`<span class="dot ${s}"></span>${counts[s]}`;
+            chip.innerHTML=`<span class="dot ${s}"></span> <strong>${counts[s]}</strong>`;
             summary.appendChild(chip);
         });
 
         header.appendChild(title);
         header.appendChild(summary);
-
         hallDiv.appendChild(header);
         hallDiv.appendChild(grid);
 
         floor.appendChild(hallDiv);
     });
-
-    applyFilter();
 }
 
-/* FILTER (SAFE) */
-function applyFilter() {
-    document.querySelectorAll(".booth").forEach(b => {
-        const s = b.classList[1];
-        b.style.opacity = activeFilters.includes(s) ? 1 : 0.15;
-    });
-}
-
-/* LEGEND CLICK */
-document.addEventListener("click", (e) => {
-    if (!e.target.closest(".legend-item")) return;
-
-    const item = e.target.closest(".legend-item");
-    const filter = item.dataset.filter;
-
-    if (filter === "all") {
-        activeFilters = ["available","sold","booked","agent"];
-        document.querySelectorAll(".legend-item").forEach(i=>i.classList.add("active"));
-    } else {
-        item.classList.toggle("active");
-
-        activeFilters = Array.from(document.querySelectorAll(".legend-item.active"))
-            .map(i => i.dataset.filter)
-            .filter(f => f && f !== "all");
-    }
-
-    applyFilter();
-});
-
-/* SEARCH (UNCHANGED) */
-searchBox.oninput = () => {
+/* =========================
+   SEARCH
+========================= */
+searchBox.addEventListener("input", () => {
     const val = searchBox.value.toLowerCase();
     suggestions.innerHTML = "";
-
-    if (!val) {
-        suggestions.style.display = "none";
-        return;
-    }
 
     const result = allData.filter(x =>
         x.boothid.includes(val) ||
@@ -198,7 +225,7 @@ searchBox.oninput = () => {
     result.forEach(x => {
         const div = document.createElement("div");
         div.className = "suggestionItem";
-        div.innerHTML = `<b>${x.display}</b><br>${x.exhibitor}`;
+        div.innerText = `${x.display} - ${x.exhibitor}`;
 
         div.onclick = () => {
             const el = document.querySelector(`[data-id='${x.boothid}']`);
@@ -211,12 +238,14 @@ searchBox.oninput = () => {
 
         suggestions.appendChild(div);
     });
-};
+});
 
-/* DRAG */
+/* =========================
+   DRAG
+========================= */
 let isDown=false,startX,startY,scrollLeft,scrollTop;
 
-container.addEventListener("mousedown",(e)=>{
+container.addEventListener("mousedown",e=>{
     isDown=true;
     startX=e.pageX;
     startY=e.pageY;
@@ -225,21 +254,32 @@ container.addEventListener("mousedown",(e)=>{
 });
 container.addEventListener("mouseup",()=>isDown=false);
 container.addEventListener("mouseleave",()=>isDown=false);
-container.addEventListener("mousemove",(e)=>{
-    if(!isDown)return;
-    container.scrollLeft = scrollLeft - (e.pageX-startX);
-    container.scrollTop = scrollTop - (e.pageY-startY);
+
+container.addEventListener("mousemove",e=>{
+    if(!isDown) return;
+    container.scrollLeft=scrollLeft-(e.pageX-startX);
+    container.scrollTop=scrollTop-(e.pageY-startY);
 });
 
-/* ZOOM */
-document.getElementById("zoomIn").onclick=()=> {
+/* =========================
+   ZOOM
+========================= */
+document.getElementById("zoomIn").onclick=()=>{
     zoomLevel+=0.1;
     floor.style.transform=`scale(${zoomLevel})`;
 };
-document.getElementById("zoomOut").onclick=()=> {
-    zoomLevel=Math.max(0.4,zoomLevel-0.1);
+document.getElementById("zoomOut").onclick=()=>{
+    zoomLevel=Math.max(0.3,zoomLevel-0.1);
     floor.style.transform=`scale(${zoomLevel})`;
 };
+
+/* =========================
+   CLOSE PANEL
+========================= */
+document.addEventListener("click",()=>{
+    panel.classList.add("hidden");
+    suggestions.style.display="none";
+});
 
 /* INIT */
 loadData();
