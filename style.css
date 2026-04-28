@@ -181,14 +181,12 @@ header {
 
 .booth-indicator {
     position: absolute;
-    bottom: 50%;
-    right: 50%;
-    transform: translate(50%, 50%);
+    bottom: 4px;
+    right: 4px;
     width: 6px;
     height: 6px;
     border-radius: 50%;
     z-index: 3;
-    margin-top: 20px;
 }
 
 .booth-indicator.type-shell {
@@ -219,7 +217,12 @@ header {
     z-index: 500;
 }
 
-/* BLINK - Bright Yellow */
+/* HIGHLIGHT & BLINK - More visible colors */
+.booth.highlight {
+    box-shadow: 0 0 30px 8px rgba(255, 255, 255, 0.6), inset 0 0 0 2px #fff !important;
+    z-index: 100;
+}
+
 @keyframes blink {
     0% { 
         box-shadow: 0 0 10px rgba(255, 193, 7, 0.6), inset 0 0 0 2px rgba(255,193,7,0.5);
@@ -234,7 +237,6 @@ header {
 
 .booth.blink { 
     animation: blink 0.6s ease-in-out infinite;
-    z-index: 100;
 }
 
 /* PANEL */
@@ -249,4 +251,4 @@ header {
     box-shadow: -2px 0 8px rgba(0,0,0,0.1);
 }
 
-.hidden { display: none; }
+.hidden { display:none; }
