@@ -132,7 +132,12 @@ function shouldShowBooth(booth) {
 ========================= */
 function createBooth(id) {
     const norm = normalizeId(id);
-    const match = allData.find(x => x.boothid === norm);
+    let match = allData.find(x => x.boothid === norm);
+    
+    // If no exact match, try to find a booth with a suffix (e.g., 5072-A for 5072)
+    if (!match) {
+        match = allData.find(x => x.boothid.startsWith(norm + "-") || x.boothid.startsWith(norm + "a"));
+    }
 
     const b = document.createElement("div");
     b.className = "booth";
