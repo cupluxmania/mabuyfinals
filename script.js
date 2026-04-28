@@ -322,23 +322,31 @@ searchBox.addEventListener("input", () => {
         div.onclick = () => {
             const el = document.querySelector(`[data-id='${x.boothid}']`);
             if (el) {
-                // Calculate position and scroll to center booth in viewport
-                const rect = el.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
+                // Get absolute position of booth accounting for all parent offsets
+                let offsetX = el.offsetLeft;
+                let offsetY = el.offsetTop;
+                let parent = el.offsetParent;
                 
-                const boothCenterX = el.offsetLeft + el.offsetWidth / 2;
-                const boothCenterY = el.offsetTop + el.offsetHeight / 2;
+                while (parent && parent !== floor) {
+                    offsetX += parent.offsetLeft;
+                    offsetY += parent.offsetTop;
+                    parent = parent.offsetParent;
+                }
                 
-                const viewportCenterX = container.clientWidth / 2;
-                const viewportCenterY = container.clientHeight / 2;
+                // Calculate scroll position to center booth in viewport
+                const boothCenterX = offsetX + (el.offsetWidth / 2);
+                const boothCenterY = offsetY + (el.offsetHeight / 2);
                 
-                container.scrollLeft = boothCenterX * zoomLevel - viewportCenterX;
-                container.scrollTop = boothCenterY * zoomLevel - viewportCenterY;
+                const scrollX = (boothCenterX * zoomLevel) - (container.clientWidth / 2);
+                const scrollY = (boothCenterY * zoomLevel) - (container.clientHeight / 2);
                 
-                // Small delay to ensure scroll happens before click
+                container.scrollLeft = Math.max(0, scrollX);
+                container.scrollTop = Math.max(0, scrollY);
+                
+                // Click booth after scroll completes
                 setTimeout(() => {
                     el.click();
-                }, 150);
+                }, 250);
             }
             searchBox.value = "";
             suggestions.style.display = "none";
