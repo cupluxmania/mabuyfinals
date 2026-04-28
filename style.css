@@ -171,25 +171,35 @@ header {
     position: relative;
     user-select: none;
     font-weight: 600;
+    flex-wrap: wrap;
+}
+
+.booth > span {
+    width: 100%;
+    text-align: center;
+    z-index: 2;
 }
 
 .booth-indicator {
     position: absolute;
-    bottom: 3px;
-    right: 3px;
-    width: 5px;
-    height: 5px;
+    bottom: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
+    z-index: 3;
 }
 
 .booth-indicator.type-shell {
-    border: 1px solid rgba(0,0,0,0.4);
-    background: rgba(255,255,255,0.4);
+    border: 1.3px solid rgba(255,255,255,0.95);
+    background: rgba(0,0,0,0.4);
+    box-shadow: 0 0 4px rgba(255,255,255,0.8);
 }
 
 .booth-indicator.type-space {
-    background: repeating-linear-gradient(45deg,rgba(255,255,255,0.6),rgba(255,255,255,0.6) 1px,transparent 1px,transparent 2px);
-    border: 0.5px solid rgba(0,0,0,0.3);
+    background: repeating-linear-gradient(45deg,rgba(255,255,255,0.95),rgba(255,255,255,0.95) 1.5px,transparent 1.5px,transparent 3px);
+    border: 0.6px solid rgba(255,255,255,0.8);
+    box-shadow: 0 0 4px rgba(255,255,255,0.7);
 }
 
 /* TOOLTIP */
@@ -208,26 +218,22 @@ header {
     z-index: 500;
 }
 
-/* HIGHLIGHT & BLINK - More visible colors */
-.booth.highlight {
-    box-shadow: 0 0 30px 8px rgba(255, 255, 255, 0.6), inset 0 0 0 2px #fff !important;
-    z-index: 100;
-}
-
+/* BLINK - Bright Yellow */
 @keyframes blink {
     0% { 
-        box-shadow: 0 0 5px rgba(253, 224, 71, 0.4), inset 0 0 0 2px rgba(253,224,71,0.3);
+        box-shadow: 0 0 10px rgba(255, 193, 7, 0.6), inset 0 0 0 2px rgba(255,193,7,0.5);
     }
     50% { 
-        box-shadow: 0 0 35px 8px rgba(253, 224, 71, 1), inset 0 0 0 3px #FDE047;
+        box-shadow: 0 0 45px 12px rgba(255, 193, 7, 1), inset 0 0 0 3px #FFC107;
     }
     100% { 
-        box-shadow: 0 0 5px rgba(253, 224, 71, 0.4), inset 0 0 0 2px rgba(253,224,71,0.3);
+        box-shadow: 0 0 10px rgba(255, 193, 7, 0.6), inset 0 0 0 2px rgba(255,193,7,0.5);
     }
 }
 
 .booth.blink { 
     animation: blink 0.6s ease-in-out infinite;
+    z-index: 100;
 }
 
 /* PANEL */
@@ -242,4 +248,4 @@ header {
     box-shadow: -2px 0 8px rgba(0,0,0,0.1);
 }
 
-.hidden { display:none; }
+.hidden { display: none; }
