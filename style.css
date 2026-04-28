@@ -71,11 +71,16 @@ header {
     align-items: center;
     gap: 6px;
     user-select: none;
+    transition: all 0.2s ease;
 }
 
 .legend-item.active {
     background: #111827;
     color: white;
+}
+
+.legend-item:not(.active) {
+    opacity: 0.6;
 }
 
 .dot {
@@ -165,14 +170,26 @@ header {
     cursor: pointer;
     position: relative;
     user-select: none;
+    font-weight: 600;
 }
 
-.type-space {
-    background-image: repeating-linear-gradient(45deg,#fff3,#fff3 6px,transparent 6px,transparent 12px);
+.booth-indicator {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
 }
 
-.type-shell {
-    border: 3px solid rgba(0,0,0,0.5);
+.booth-indicator.type-shell {
+    border: 1.5px solid rgba(0,0,0,0.4);
+    background: rgba(255,255,255,0.3);
+}
+
+.booth-indicator.type-space {
+    background: repeating-linear-gradient(45deg,rgba(255,255,255,0.5),rgba(255,255,255,0.5) 2px,transparent 2px,transparent 4px);
+    border: 1px solid rgba(0,0,0,0.2);
 }
 
 /* TOOLTIP */
@@ -184,17 +201,34 @@ header {
     transform: translateX(-50%);
     background: black;
     color: white;
-    padding: 5px;
+    padding: 8px 10px;
     border-radius: 5px;
     font-size: 11px;
     white-space: nowrap;
+    z-index: 500;
 }
 
-/* BLINK */
-@keyframes blink {
-    50% { box-shadow: 0 0 20px yellow; }
+/* HIGHLIGHT & BLINK - More visible colors */
+.booth.highlight {
+    box-shadow: 0 0 30px 8px rgba(255, 255, 255, 0.6), inset 0 0 0 2px #fff !important;
+    z-index: 100;
 }
-.blink { animation: blink 1s infinite; }
+
+@keyframes blink {
+    0% { 
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.3), inset 0 0 0 2px rgba(255,255,255,0.5);
+    }
+    50% { 
+        box-shadow: 0 0 40px 12px rgba(255, 255, 255, 0.8), inset 0 0 0 3px #fff;
+    }
+    100% { 
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.3), inset 0 0 0 2px rgba(255,255,255,0.5);
+    }
+}
+
+.booth.blink { 
+    animation: blink 0.6s ease-in-out infinite;
+}
 
 /* PANEL */
 #sidePanel {
@@ -204,5 +238,8 @@ header {
     background: white;
     padding: 15px;
     width: 250px;
+    border-left: 1px solid #ddd;
+    box-shadow: -2px 0 8px rgba(0,0,0,0.1);
 }
+
 .hidden { display:none; }
