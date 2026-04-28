@@ -134,20 +134,31 @@ header {
 
 .hall-header {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.hall-header h3 {
+    margin: 0;
+    font-size: 14px;
+    min-width: 60px;
 }
 
 .hall-summary {
     display: flex;
-    gap: 6px;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .count-chip {
     display: flex;
     gap: 4px;
+    align-items: center;
     background: white;
-    padding: 4px 8px;
+    padding: 3px 6px;
     border-radius: 20px;
+    font-size: 12px;
+    white-space: nowrap;
 }
 
 /* GRID */
