@@ -10,6 +10,7 @@ const legend = document.getElementById("legend");
 
 let allData = [];
 let zoomLevel = 0.4;
+
 let activeFilters = {
     status: {available:true, sold:true, booked:true, agent:true},
     type: {shell:true, space:true},
@@ -41,11 +42,11 @@ function getBoothType(row) {
     return t.includes("space") ? "space" : "shell";
 }
 
-/* LOAD DATA (FIXED) */
+/* LOAD DATA */
 async function loadData() {
     try {
         const res = await fetch(`${G_SCRIPT_URL}?cmd=read&t=${Date.now()}`);
-        const raw = await res.json(); // ✅ FIXED
+        const raw = await res.json();
 
         const expanded = [];
 
@@ -94,7 +95,7 @@ const hallConfig = [
   {name:"Ambulance", start:"A", end:"Z"}
 ];
 
-/* FILTER */
+/* FILTER LOGIC */
 function shouldShowBooth(booth) {
     if (activeFilters.all) return true;
     return activeFilters.status[booth.status] && activeFilters.type[booth.type];
@@ -112,12 +113,16 @@ function createBooth(id) {
     const b = document.createElement("div");
     b.className = "booth";
     b.dataset.id = norm;
-    b.dataset.status = match ? match.status : "available";
-    b.dataset.type = match ? match.type : "shell";
+
+    const status = match ? match.status : "available";
+    const type = match ? match.type : "shell";
+
+    b.dataset.status = status;
+    b.dataset.type = type;
+
+    b.classList.add(status);
 
     const displayName = match ? match.display : id;
-
-    b.classList.add(match ? match.status : "available");
 
     const textSpan = document.createElement("span");
     textSpan.innerText = displayName;
@@ -125,7 +130,7 @@ function createBooth(id) {
 
     if (match) {
         const indicator = document.createElement("div");
-        indicator.className = `booth-indicator type-${match.type}`;
+        indicator.className = `booth-indicator type-${type}`;
         b.appendChild(indicator);
 
         b.dataset.tooltip = match.exhibitor
@@ -133,10 +138,7 @@ function createBooth(id) {
             : `AVAILABLE • ${match.sqm} Sqm`;
     }
 
-    b.style.display = shouldShowBooth({
-        status: b.dataset.status,
-        type: b.dataset.type
-    }) ? "flex" : "none";
+    b.style.display = shouldShowBooth({status, type}) ? "flex" : "none";
 
     b.onclick = (e) => {
         e.stopPropagation();
@@ -150,8 +152,8 @@ function createBooth(id) {
         panelContent.innerHTML = `
             <b>Booth:</b> ${displayName}<br>
             <b>Size:</b> ${match?.sqm || "-"} Sqm<br>
-            <b>Status:</b> ${b.dataset.status.toUpperCase()}<br>
-            <b>Type:</b> ${b.dataset.type === 'space' ? 'Space Only' : 'Standard Booth'}<br>
+            <b>Status:</b> ${status.toUpperCase()}<br>
+            <b>Type:</b> ${type === 'space' ? 'Space Only' : 'Standard Booth'}<br>
             <b>Exhibitor:</b> ${match?.exhibitor || "-"}
         `;
     };
@@ -210,7 +212,52 @@ function renderFloor() {
     });
 }
 
-/* SEARCH (FIXED) */
+/* FILTER CLICK */
+legend.addEventListener("click", (e) => {
+    const item = e.target.closest(".legend-item");
+    if (!item) return;
+
+    const filter = item.dataset.filter;
+    const type = item.dataset.type;
+
+    if (filter) {
+        if (filter === "all") {
+            const allActive = Object.values(activeFilters.status).every(v => v);
+            activeFilters.status = {
+                available: !allActive,
+                sold: !allActive,
+                booked: !allActive,
+                agent: !allActive
+            };
+            activeFilters.all = !allActive;
+
+            document.querySelectorAll(".legend-item[data-filter]").forEach(el => {
+                if (el.dataset.filter !== "all") {
+                    el.classList.toggle("active", !allActive);
+                }
+            });
+
+        } else {
+            activeFilters.status[filter] = !activeFilters.status[filter];
+            item.classList.toggle("active");
+            activeFilters.all = Object.values(activeFilters.status).every(v => v);
+        }
+    }
+
+    if (type) {
+        activeFilters.type[type] = !activeFilters.type[type];
+        item.classList.toggle("active");
+    }
+
+    document.querySelectorAll(".booth").forEach(booth => {
+        booth.style.display = shouldShowBooth({
+            status: booth.dataset.status,
+            type: booth.dataset.type
+        }) ? "flex" : "none";
+    });
+});
+
+/* SEARCH */
 searchBox.addEventListener("input", () => {
     const val = searchBox.value.toLowerCase();
     suggestions.innerHTML = "";
@@ -229,7 +276,24 @@ searchBox.addEventListener("input", () => {
 
         div.onclick = () => {
             const el = document.querySelector(`[data-id='${x.boothid}']`);
-            if (el) el.click();
+
+            if (el) {
+                el.style.display = "flex";
+
+                const rect = el.getBoundingClientRect();
+                const parentRect = container.getBoundingClientRect();
+
+                const offsetX = rect.left - parentRect.left;
+                const offsetY = rect.top - parentRect.top;
+
+                container.scrollTo({
+                    left: container.scrollLeft + offsetX - container.clientWidth / 2 + rect.width / 2,
+                    top: container.scrollTop + offsetY - container.clientHeight / 2 + rect.height / 2,
+                    behavior: "smooth"
+                });
+
+                setTimeout(() => el.click(), 300);
+            }
 
             searchBox.value = "";
             suggestions.style.display = "none";
