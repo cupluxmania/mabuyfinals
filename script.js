@@ -9,66 +9,43 @@ const panelContent = document.getElementById("panelContent");
 const legend = document.getElementById("legend");
 
 let allData = [];
-let zoomLevel = 0.4; // Default zoom to show ~3 halls
-let activeFilters = {status: {available:true, sold:true, booked:true, agent:true}, type: {shell:true, space:true}, all: true};
+let zoomLevel = 0.4;
+let activeFilters = {
+    status: {available:true, sold:true, booked:true, agent:true},
+    type: {shell:true, space:true},
+    all: true
+};
 
-/* =========================
-   CLEAN TEXT
-========================= */
+/* CLEAN */
 function cleanText(val) {
     if (!val) return "";
     return String(val).replace(/\s+/g, " ").trim();
 }
 
-/* =========================
-   NORMALIZE ID (only for internal matching)
-========================= */
+/* NORMALIZE */
 function normalizeId(id) {
     return String(id || "").replace(/\s+/g, "").toLowerCase();
 }
 
-/* =========================
-   STATUS
-========================= */
+/* STATUS */
 function getStatus(row) {
     const s = cleanText(row.status).toLowerCase();
     if (["available","sold","booked","agent"].includes(s)) return s;
     return "available";
 }
 
-/* =========================
-   GET BOOTH TYPE
-========================= */
+/* TYPE */
 function getBoothType(row) {
-    if (!row || !row.type) return "shell"; // default to shell
+    if (!row || !row.type) return "shell";
     const t = cleanText(row.type).toLowerCase();
     return t.includes("space") ? "space" : "shell";
 }
 
-/* =========================
-   LOAD DATA (FIXED 100%)
-========================= */
+/* LOAD DATA (FIXED) */
 async function loadData() {
     try {
         const res = await fetch(`${G_SCRIPT_URL}?cmd=read&t=${Date.now()}`);
-
-        console.log("HTTP STATUS:", res.status);
-
-        const text = await res.text();
-
-        console.log("RAW RESPONSE:", text);
-
-        // ❌ If Apps Script returns HTML or empty
-        if (!text || text.startsWith("<")) {
-            throw new Error("Invalid response (HTML or empty)");
-        }
-
-        let raw;
-        try {
-            raw = JSON.parse(text);
-        } catch (e) {
-            throw new Error("Response is not valid JSON");
-        }
+        const raw = await res.json(); // ✅ FIXED
 
         const expanded = [];
 
@@ -86,7 +63,7 @@ async function loadData() {
             booths.forEach(id => {
                 expanded.push({
                     boothid: normalizeId(id),
-                    display: id, // Keep original name with suffixes like 5072-A
+                    display: id,
                     exhibitor: cleanText(row.exhibitor),
                     status: getStatus(row),
                     type: getBoothType(row),
@@ -97,8 +74,7 @@ async function loadData() {
 
         allData = expanded;
         renderFloor();
-        
-        // Apply default zoom after rendering
+
         floor.style.transform = `scale(${zoomLevel})`;
 
     } catch (err) {
@@ -107,9 +83,7 @@ async function loadData() {
     }
 }
 
-/* =========================
-   HALL CONFIG
-========================= */
+/* HALL CONFIG */
 const hallConfig = [
   {name:"Hall 5", start:5001, end:5078},
   {name:"Hall 6", start:6001, end:6189},
@@ -120,26 +94,19 @@ const hallConfig = [
   {name:"Ambulance", start:"A", end:"Z"}
 ];
 
-/* =========================
-   SHOULD BOOTH BE VISIBLE
-========================= */
+/* FILTER */
 function shouldShowBooth(booth) {
     if (activeFilters.all) return true;
-    const statusMatch = activeFilters.status[booth.status];
-    const typeMatch = activeFilters.type[booth.type];
-    return statusMatch && typeMatch;
+    return activeFilters.status[booth.status] && activeFilters.type[booth.type];
 }
 
-/* =========================
-   CREATE BOOTH
-========================= */
+/* CREATE BOOTH */
 function createBooth(id) {
     const norm = normalizeId(id);
     let match = allData.find(x => x.boothid === norm);
-    
-    // If no exact match, try to find a booth with a suffix (e.g., 5072-A for 5072)
+
     if (!match) {
-        match = allData.find(x => x.boothid.startsWith(norm + "-") || x.boothid.startsWith(norm + "a"));
+        match = allData.find(x => x.boothid.startsWith(norm + "-"));
     }
 
     const b = document.createElement("div");
@@ -150,30 +117,26 @@ function createBooth(id) {
 
     const displayName = match ? match.display : id;
 
-    if (!match) {
-        b.classList.add("available");
-        const textSpan = document.createElement("span");
-        textSpan.innerText = displayName;
-        b.appendChild(textSpan);
-        b.style.display = shouldShowBooth({status: "available", type: "shell"}) ? "flex" : "none";
-        return b;
-    }
+    b.classList.add(match ? match.status : "available");
 
-    b.classList.add(match.status);
-    
     const textSpan = document.createElement("span");
     textSpan.innerText = displayName;
     b.appendChild(textSpan);
 
-    const indicator = document.createElement("div");
-    indicator.className = `booth-indicator type-${match.type}`;
-    b.appendChild(indicator);
+    if (match) {
+        const indicator = document.createElement("div");
+        indicator.className = `booth-indicator type-${match.type}`;
+        b.appendChild(indicator);
 
-    b.dataset.tooltip = match.exhibitor
-        ? `${match.exhibitor} • ${match.sqm} Sqm`
-        : `AVAILABLE • ${match.sqm} Sqm`;
+        b.dataset.tooltip = match.exhibitor
+            ? `${match.exhibitor} • ${match.sqm} Sqm`
+            : `AVAILABLE • ${match.sqm} Sqm`;
+    }
 
-    b.style.display = shouldShowBooth(match) ? "flex" : "none";
+    b.style.display = shouldShowBooth({
+        status: b.dataset.status,
+        type: b.dataset.type
+    }) ? "flex" : "none";
 
     b.onclick = (e) => {
         e.stopPropagation();
@@ -183,29 +146,24 @@ function createBooth(id) {
 
         b.classList.add("highlight","blink");
 
-        setTimeout(() => b.classList.remove("blink"), 5000);
-
         panel.classList.remove("hidden");
         panelContent.innerHTML = `
             <b>Booth:</b> ${displayName}<br>
-            <b>Size:</b> ${match.sqm} Sqm<br>
-            <b>Status:</b> ${match.status.toUpperCase()}<br>
-            <b>Type:</b> ${match.type === 'space' ? 'Space Only' : 'Standard Booth'}<br>
-            <b>Exhibitor:</b> ${match.exhibitor || "-"}
+            <b>Size:</b> ${match?.sqm || "-"} Sqm<br>
+            <b>Status:</b> ${b.dataset.status.toUpperCase()}<br>
+            <b>Type:</b> ${b.dataset.type === 'space' ? 'Space Only' : 'Standard Booth'}<br>
+            <b>Exhibitor:</b> ${match?.exhibitor || "-"}
         `;
     };
 
     return b;
 }
 
-/* =========================
-   RENDER FLOOR
-========================= */
+/* RENDER */
 function renderFloor() {
     floor.innerHTML = "";
 
     hallConfig.forEach(hall => {
-
         const hallDiv = document.createElement("div");
         hallDiv.className = "hall";
 
@@ -219,7 +177,6 @@ function renderFloor() {
         summary.className = "hall-summary";
 
         const counts = {available:0,sold:0,booked:0,agent:0};
-
         const grid = document.createElement("div");
         grid.className = "grid";
 
@@ -231,12 +188,11 @@ function renderFloor() {
             for (let i=hall.start;i<=hall.end;i++) ids.push(String(i));
         }
 
-        ids.forEach(id => {
+        ids.forEach(id=>{
             const booth = createBooth(id);
             grid.appendChild(booth);
 
-            const s = booth.dataset.status;
-            if(counts[s] !== undefined) counts[s]++;
+            counts[booth.dataset.status]++;
         });
 
         ["available","sold","booked","agent"].forEach(s=>{
@@ -250,59 +206,11 @@ function renderFloor() {
         header.appendChild(summary);
         hallDiv.appendChild(header);
         hallDiv.appendChild(grid);
-
         floor.appendChild(hallDiv);
     });
 }
 
-/* =========================
-   LEGEND CLICK HANDLING
-========================= */
-legend.addEventListener("click", (e) => {
-    const item = e.target.closest(".legend-item");
-    if (!item) return;
-
-    const filter = item.dataset.filter;
-    const type = item.dataset.type;
-
-    if (filter) {
-        if (filter === "all") {
-            // Toggle all status filters
-            const allActive = Object.values(activeFilters.status).every(v => v);
-            activeFilters.status = {available: !allActive, sold: !allActive, booked: !allActive, agent: !allActive};
-            activeFilters.all = !allActive;
-            
-            // Update all legend items
-            document.querySelectorAll(".legend-item[data-filter]").forEach(el => {
-                if (el.dataset.filter !== "all") {
-                    el.classList.toggle("active");
-                }
-            });
-        } else {
-            activeFilters.status[filter] = !activeFilters.status[filter];
-            activeFilters.all = Object.values(activeFilters.status).every(v => v);
-        }
-        item.classList.toggle("active");
-    }
-
-    if (type) {
-        activeFilters.type[type] = !activeFilters.type[type];
-        item.classList.toggle("active");
-    }
-
-    // Re-render booths with visibility toggle
-    document.querySelectorAll(".booth").forEach(booth => {
-        const boothData = {
-            status: booth.dataset.status,
-            type: booth.dataset.type
-        };
-        booth.style.display = shouldShowBooth(boothData) ? "flex" : "none";
-    });
-});
-
-/* =========================
-   SEARCH
-========================= */
+/* SEARCH (FIXED) */
 searchBox.addEventListener("input", () => {
     const val = searchBox.value.toLowerCase();
     suggestions.innerHTML = "";
@@ -321,49 +229,8 @@ searchBox.addEventListener("input", () => {
 
         div.onclick = () => {
             const el = document.querySelector(`[data-id='${x.boothid}']`);
-            if (el) {
-                // Make sure booth is visible (handle filters)
-                el.style.display = "flex";
-                
-                // Force a small delay to ensure element is rendered
-                setTimeout(() => {
-                    // Scroll to booth position
-                    const rect = el.getBoundingClientRect();
-                    const parentRect = floor.getBoundingClientRect();
-                    
-                    // Get position relative to floor
-                    let booth = el;
-                    let offsetX = 0;
-                    let offsetY = 0;
-                    
-                    while (booth && booth !== floor) {
-                        offsetX += booth.offsetLeft;
-                        offsetY += booth.offsetTop;
-                        booth = booth.offsetParent;
-                    }
-                    
-                    // Account for zoom level and container dimensions
-                    const boothCenterX = offsetX + (el.offsetWidth / 2);
-                    const boothCenterY = offsetY + (el.offsetHeight / 2);
-                    
-                    const containerCenterX = container.clientWidth / 2;
-                    const containerCenterY = container.clientHeight / 2;
-                    
-                    const targetScrollX = (boothCenterX * zoomLevel) - containerCenterX;
-                    const targetScrollY = (boothCenterY * zoomLevel) - containerCenterY;
-                    
-                    container.scrollLeft = targetScrollX;
-                    container.scrollTop = targetScrollY;
-                    
-                    // Trigger booth click to show panel
-                    setTimeout(() => {
-                        el.click();
-                    }, 100);
-                }, 50);
-            }
-            searchBox.value = "";
-            suggestions.style.display = "none";
-        };
+            if (el) el.click();
+
             searchBox.value = "";
             suggestions.style.display = "none";
         };
@@ -372,9 +239,7 @@ searchBox.addEventListener("input", () => {
     });
 });
 
-/* =========================
-   DRAG
-========================= */
+/* DRAG */
 let isDown=false,startX,startY,scrollLeft,scrollTop;
 
 container.addEventListener("mousedown",e=>{
@@ -393,10 +258,7 @@ container.addEventListener("mousemove",e=>{
     container.scrollTop=scrollTop-(e.pageY-startY);
 });
 
-/* =========================
-   ZOOM
-========================= */
-// Button zoom
+/* ZOOM */
 document.getElementById("zoomIn").onclick=()=>{
     zoomLevel+=0.1;
     floor.style.transform=`scale(${zoomLevel})`;
@@ -406,19 +268,7 @@ document.getElementById("zoomOut").onclick=()=>{
     floor.style.transform=`scale(${zoomLevel})`;
 };
 
-// Mouse wheel zoom
-container.addEventListener("wheel", (e) => {
-    if (e.ctrlKey) {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        zoomLevel = Math.max(0.3, Math.min(3, zoomLevel + delta));
-        floor.style.transform = `scale(${zoomLevel})`;
-    }
-}, {passive: false});
-
-/* =========================
-   CLOSE PANEL
-========================= */
+/* CLOSE PANEL */
 document.addEventListener("click",()=>{
     panel.classList.add("hidden");
     suggestions.style.display="none";
