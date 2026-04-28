@@ -175,10 +175,10 @@ function createBooth(id) {
     b.onclick = (e) => {
         e.stopPropagation();
 
-        document.querySelectorAll(".highlight, .blink")
-            .forEach(x => x.classList.remove("highlight","blink"));
+        document.querySelectorAll(".blink")
+            .forEach(x => x.classList.remove("blink"));
 
-        b.classList.add("highlight","blink");
+        b.classList.add("blink");
 
         setTimeout(() => b.classList.remove("blink"), 5000);
 
