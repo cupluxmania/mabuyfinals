@@ -175,21 +175,21 @@ header {
 
 .booth-indicator {
     position: absolute;
-    bottom: 4px;
-    right: 4px;
-    width: 8px;
-    height: 8px;
+    bottom: 3px;
+    right: 3px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
 }
 
 .booth-indicator.type-shell {
-    border: 1.5px solid rgba(0,0,0,0.4);
-    background: rgba(255,255,255,0.3);
+    border: 1px solid rgba(0,0,0,0.4);
+    background: rgba(255,255,255,0.4);
 }
 
 .booth-indicator.type-space {
-    background: repeating-linear-gradient(45deg,rgba(255,255,255,0.5),rgba(255,255,255,0.5) 2px,transparent 2px,transparent 4px);
-    border: 1px solid rgba(0,0,0,0.2);
+    background: repeating-linear-gradient(45deg,rgba(255,255,255,0.6),rgba(255,255,255,0.6) 1px,transparent 1px,transparent 2px);
+    border: 0.5px solid rgba(0,0,0,0.3);
 }
 
 /* TOOLTIP */
@@ -216,13 +216,13 @@ header {
 
 @keyframes blink {
     0% { 
-        box-shadow: 0 0 10px rgba(255, 255, 255, 0.3), inset 0 0 0 2px rgba(255,255,255,0.5);
+        box-shadow: 0 0 5px rgba(253, 224, 71, 0.4), inset 0 0 0 2px rgba(253,224,71,0.3);
     }
     50% { 
-        box-shadow: 0 0 40px 12px rgba(255, 255, 255, 0.8), inset 0 0 0 3px #fff;
+        box-shadow: 0 0 35px 8px rgba(253, 224, 71, 1), inset 0 0 0 3px #FDE047;
     }
     100% { 
-        box-shadow: 0 0 10px rgba(255, 255, 255, 0.3), inset 0 0 0 2px rgba(255,255,255,0.5);
+        box-shadow: 0 0 5px rgba(253, 224, 71, 0.4), inset 0 0 0 2px rgba(253,224,71,0.3);
     }
 }
 
