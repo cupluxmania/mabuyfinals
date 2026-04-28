@@ -322,32 +322,48 @@ searchBox.addEventListener("input", () => {
         div.onclick = () => {
             const el = document.querySelector(`[data-id='${x.boothid}']`);
             if (el) {
-                // Get absolute position of booth accounting for all parent offsets
-                let offsetX = el.offsetLeft;
-                let offsetY = el.offsetTop;
-                let parent = el.offsetParent;
+                // Make sure booth is visible (handle filters)
+                el.style.display = "flex";
                 
-                while (parent && parent !== floor) {
-                    offsetX += parent.offsetLeft;
-                    offsetY += parent.offsetTop;
-                    parent = parent.offsetParent;
-                }
-                
-                // Calculate scroll position to center booth in viewport
-                const boothCenterX = offsetX + (el.offsetWidth / 2);
-                const boothCenterY = offsetY + (el.offsetHeight / 2);
-                
-                const scrollX = (boothCenterX * zoomLevel) - (container.clientWidth / 2);
-                const scrollY = (boothCenterY * zoomLevel) - (container.clientHeight / 2);
-                
-                container.scrollLeft = Math.max(0, scrollX);
-                container.scrollTop = Math.max(0, scrollY);
-                
-                // Click booth after scroll completes
+                // Force a small delay to ensure element is rendered
                 setTimeout(() => {
-                    el.click();
-                }, 250);
+                    // Scroll to booth position
+                    const rect = el.getBoundingClientRect();
+                    const parentRect = floor.getBoundingClientRect();
+                    
+                    // Get position relative to floor
+                    let booth = el;
+                    let offsetX = 0;
+                    let offsetY = 0;
+                    
+                    while (booth && booth !== floor) {
+                        offsetX += booth.offsetLeft;
+                        offsetY += booth.offsetTop;
+                        booth = booth.offsetParent;
+                    }
+                    
+                    // Account for zoom level and container dimensions
+                    const boothCenterX = offsetX + (el.offsetWidth / 2);
+                    const boothCenterY = offsetY + (el.offsetHeight / 2);
+                    
+                    const containerCenterX = container.clientWidth / 2;
+                    const containerCenterY = container.clientHeight / 2;
+                    
+                    const targetScrollX = (boothCenterX * zoomLevel) - containerCenterX;
+                    const targetScrollY = (boothCenterY * zoomLevel) - containerCenterY;
+                    
+                    container.scrollLeft = targetScrollX;
+                    container.scrollTop = targetScrollY;
+                    
+                    // Trigger booth click to show panel
+                    setTimeout(() => {
+                        el.click();
+                    }, 100);
+                }, 50);
             }
+            searchBox.value = "";
+            suggestions.style.display = "none";
+        };
             searchBox.value = "";
             suggestions.style.display = "none";
         };
