@@ -149,15 +149,19 @@ function createBooth(id) {
 
     if (!match) {
         b.classList.add("available");
-        b.innerText = displayName;
+        const textSpan = document.createElement("span");
+        textSpan.innerText = displayName;
+        b.appendChild(textSpan);
         b.style.display = shouldShowBooth({status: "available", type: "shell"}) ? "flex" : "none";
         return b;
     }
 
     b.classList.add(match.status);
-    b.innerText = displayName;
+    
+    const textSpan = document.createElement("span");
+    textSpan.innerText = displayName;
+    b.appendChild(textSpan);
 
-    // Add booth type indicator
     const indicator = document.createElement("div");
     indicator.className = `booth-indicator type-${match.type}`;
     b.appendChild(indicator);
