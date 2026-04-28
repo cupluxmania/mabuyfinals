@@ -9,7 +9,7 @@ const panelContent = document.getElementById("panelContent");
 const legend = document.getElementById("legend");
 
 let allData = [];
-let zoomLevel = 1;
+let zoomLevel = 0.4; // Default zoom to show ~3 halls
 let activeFilters = {status: {available:true, sold:true, booked:true, agent:true}, type: {shell:true, space:true}, all: true};
 
 /* =========================
@@ -97,6 +97,9 @@ async function loadData() {
 
         allData = expanded;
         renderFloor();
+        
+        // Apply default zoom after rendering
+        floor.style.transform = `scale(${zoomLevel})`;
 
     } catch (err) {
         console.error("LOAD ERROR:", err);
@@ -175,10 +178,10 @@ function createBooth(id) {
     b.onclick = (e) => {
         e.stopPropagation();
 
-        document.querySelectorAll(".blink")
-            .forEach(x => x.classList.remove("blink"));
+        document.querySelectorAll(".highlight, .blink")
+            .forEach(x => x.classList.remove("highlight","blink"));
 
-        b.classList.add("blink");
+        b.classList.add("highlight","blink");
 
         setTimeout(() => b.classList.remove("blink"), 5000);
 
@@ -319,13 +322,23 @@ searchBox.addEventListener("input", () => {
         div.onclick = () => {
             const el = document.querySelector(`[data-id='${x.boothid}']`);
             if (el) {
-                // Scroll and center the booth
-                el.scrollIntoView({behavior:"smooth",block:"center"});
+                // Calculate position and scroll to center booth in viewport
+                const rect = el.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                
+                const boothCenterX = el.offsetLeft + el.offsetWidth / 2;
+                const boothCenterY = el.offsetTop + el.offsetHeight / 2;
+                
+                const viewportCenterX = container.clientWidth / 2;
+                const viewportCenterY = container.clientHeight / 2;
+                
+                container.scrollLeft = boothCenterX * zoomLevel - viewportCenterX;
+                container.scrollTop = boothCenterY * zoomLevel - viewportCenterY;
                 
                 // Small delay to ensure scroll happens before click
                 setTimeout(() => {
                     el.click();
-                }, 100);
+                }, 150);
             }
             searchBox.value = "";
             suggestions.style.display = "none";
@@ -359,6 +372,7 @@ container.addEventListener("mousemove",e=>{
 /* =========================
    ZOOM
 ========================= */
+// Button zoom
 document.getElementById("zoomIn").onclick=()=>{
     zoomLevel+=0.1;
     floor.style.transform=`scale(${zoomLevel})`;
@@ -367,6 +381,16 @@ document.getElementById("zoomOut").onclick=()=>{
     zoomLevel=Math.max(0.3,zoomLevel-0.1);
     floor.style.transform=`scale(${zoomLevel})`;
 };
+
+// Mouse wheel zoom
+container.addEventListener("wheel", (e) => {
+    if (e.ctrlKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        zoomLevel = Math.max(0.3, Math.min(3, zoomLevel + delta));
+        floor.style.transform = `scale(${zoomLevel})`;
+    }
+}, {passive: false});
 
 /* =========================
    CLOSE PANEL
